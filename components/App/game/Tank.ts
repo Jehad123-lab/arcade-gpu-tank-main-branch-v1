@@ -60,19 +60,19 @@ export class Tank {
     this.antenna = createBoxMesh(0.05, 1.5, 0.05, [0.1, 0.1, 0.1]);
 
     this.physicsBody = gfx3JoltManager.addBox({
-      width: 3.45, height: 0.9, depth: 3.6,
-      x: 0, y: 0.8, z: 0,
+      width: 3.45, height: 1.2, depth: 3.6, // Increased height for better collision volume
+      x: 0, y: 1.0, z: 0,
       motionType: Gfx3Jolt.EMotionType_Dynamic,
       layer: JOLT_LAYER_MOVING,
       settings: { 
-          mAngularDamping: 20.0, // Extremely high angular damping to stop all wobble
-          mLinearDamping: 2.5,
-          mMassPropertiesOverride: 8000.0 // Very heavy tank for maximum stability
+          mAngularDamping: 10.0, 
+          mLinearDamping: 1.5,
+          mMassPropertiesOverride: 10000.0, // Even heavier for grounded feel
+          mCenterOfMassOffset: new Gfx3Jolt.Vec3(0, -0.4, 0) // Lower center of mass for stability
       }
     });
 
-    // Strategy: We will NO LONGER use SetRotation/SetLinearVelocity every frame.
-    // Instead, we will use AddForce and let the physics solver handle collisions smoothly.
+    // Strategy: We use smoothed velocity updates and a stabilization torque.
   }
 
   /**
@@ -162,7 +162,19 @@ export class Tank {
 
     const uprightQuat = Quaternion.createFromEuler(this.rotation, 0, 0, 'YXZ');
     
-    // MOVEMENT STABILITY: Use [0, 0, 1] as forward. 
+    // STABILIZATION TORQUE: Neutralize Pitch and Roll (X, Z) to keep the tank upright.
+    // We calculate the current local "up" in world space and apply torque towards world "up".
+    const currentUpVec = currentQuat.rotateVector([0, 1, 0]);
+    const tiltErrorX = -currentUpVec[2]; // Simplified roll/pitch error
+    const tiltErrorZ = currentUpVec[0];  
+    const stabilityAlpha = 5000000.0; // Strong corrective torque
+    
+    gfx3JoltManager.bodyInterface.AddTorque(
+        this.physicsBody.body.GetID(), 
+        new Gfx3Jolt.Vec3(tiltErrorX * stabilityAlpha, 0, tiltErrorZ * stabilityAlpha)
+    );
+
+    // MOVEMENT STABILITY: Proportional Velocity matching
     const forwardVecActual = uprightQuat.rotateVector([0, 0, 1]);
     const currentJoltVel = this.physicsBody.body.GetLinearVelocity();
     const targetLinearVel = UT.VEC3_SCALE(forwardVecActual, this.velocity);
@@ -227,8 +239,8 @@ export class Tank {
        if (targetUp[1] < 0) targetUp = UT.VEC3_SCALE(targetUp, -1);
     }
     
-    // Increased smoothing for visual banking (2.5 smoothing factor)
-    this.currentUp = UT.VEC3_LERP(this.currentUp, targetUp, 2.5 * (ts / 1000));
+    // More conservative smoothing for visual banking (2.0 smoothing factor)
+    this.currentUp = UT.VEC3_LERP(this.currentUp, targetUp, 2.0 * (ts / 1000));
     this.currentUp = UT.VEC3_NORMALIZE(this.currentUp);
 
     const up: vec3 = [0, 1, 0];

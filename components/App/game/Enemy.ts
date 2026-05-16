@@ -81,14 +81,15 @@ export class Enemy {
     }
 
     this.physicsBody = gfx3JoltManager.addBox({
-      width: 1.5, height: 0.6, depth: 2.2,
-      x, y: y + 0.4, z,
+      width: 1.5, height: 0.8, depth: 2.2, // Increased height for stability
+      x, y: y + 0.5, z,
       motionType: Gfx3Jolt.EMotionType_Dynamic,
       layer: JOLT_LAYER_MOVING,
       settings: { 
-          mAngularDamping: 10.0, 
+          mAngularDamping: 15.0, 
           mLinearDamping: 2.0,
-          mMassPropertiesOverride: 1000.0 // Adjusted for enemy size
+          mMassPropertiesOverride: 1500.0,
+          mCenterOfMassOffset: new Gfx3Jolt.Vec3(0, -0.3, 0) // Lower COM
       }
     });
   }
@@ -133,6 +134,14 @@ export class Enemy {
     gfx3JoltManager.bodyInterface.SetAngularVelocity(
         this.physicsBody.body.GetID(), 
         new Gfx3Jolt.Vec3(curAngVel.GetX() * 0.2, UT.LERP(curAngVel.GetY(), turnVel, turnAlpha), curAngVel.GetZ() * 0.2)
+    );
+
+    // STABILIZATION TORQUE: Neutralize Pitch and Roll
+    const currentUpVec = currentQuat.rotateVector([0, 1, 0]);
+    const stabilityAlpha = 500000.0; // Proportional to enemy mass
+    gfx3JoltManager.bodyInterface.AddTorque(
+        this.physicsBody.body.GetID(), 
+        new Gfx3Jolt.Vec3(-currentUpVec[2] * stabilityAlpha, 0, currentUpVec[0] * stabilityAlpha)
     );
 
     let quat = currentQuat;

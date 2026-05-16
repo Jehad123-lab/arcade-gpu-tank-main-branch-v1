@@ -14,6 +14,7 @@ A log of all tasks, ideas, and progress for this project.
 
 ## Done
 
+-   **[2026-05-16 10:45]**: Fixed tank tilting and collision issues. Implemented a "Spring Torque" stabilization system to pull physics bodies upright smoothly without jitter. Lowered the tank's center of mass (mCenterOfMassOffset) and increased collision volume height (1.2m) to prevent clipping into the ground. Standardized visual banking to be more conservative.
 -   **[2026-05-16 10:39]**: Final Stability & Control Standardisation: Fixed control inversion by standardizing the forward axis as `[0, 0, 1]` across player and AI. Switched to an extremely heavy physics model (8000 mass) with high damping (20.0 angular) to eliminate all jitter. Removed all physics rotation overrides (`SetRotation`) that caused shaking.
 -   **[2026-05-16 10:24]**: Fixed high-frequency tank shaking/jitter. Removed frame-by-frame `SetRotation` overrides on the physics body, switching to high angular damping for stability. Implemented exponential smoothing for all velocity updates (Player & AI) to prevent solver oscillation. Smoothed visual banking logic to better handle terrain bumps.
 -   **[2026-05-16 10:14]**: Major Stability & Control Overhaul: Switched to velocity-based movement (SetLinearVelocity) for both Player and AI to eliminate physics jitter/shaking. Implemented an aggressive anti-flip system that forces physics hulls to remain perfectly upright. Standardized forward vectors and throttle signs to fix W/S and A/D inversions. Toned down screen shake and refined camera look-at tracking.
