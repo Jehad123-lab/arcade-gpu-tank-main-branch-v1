@@ -52,15 +52,14 @@ export class GameScreen extends Screen {
   projectiles: Projectile[] = [];
   shellMesh: Gfx3Mesh;
   grenadeMesh: Gfx3Mesh;
-  laserMesh: Gfx3Mesh;
   moveDir = { x: 0, y: 0 };
   virtualFireNormal: boolean = false;
   virtualFireGrenade: boolean = false;
   wasFiring = false;
   
   cameraYaw = 0; 
-  cameraPitch = 0.2;
-  cameraDistance = 12;
+  cameraPitch = 0.45;
+  cameraDistance = 18;
   isReady: boolean = false;
   cameraLookTarget: vec3 = [0, 0, 0];
   rightClickFire: boolean = false;
@@ -81,8 +80,7 @@ export class GameScreen extends Screen {
     
     // Create base meshes for projectiles
     this.shellMesh = createBoxMesh(0.4, 0.4, 1.2, [1.0, 0.8, 0.2]); // Visible golden shell
-    this.grenadeMesh = createBoxMesh(0.6, 0.6, 0.6, [0.4, 0.4, 0.4]); // Grenade body
-    this.laserMesh = createBoxMesh(0.04, 0.04, 100, [1.0, 0.0, 0.0]); // Laser sight
+    this.grenadeMesh = createBoxMesh(0.6, 0.6, 0.6, [1.0, 0.3, 0.1]); // Bright grenade body
 
     // Spawn exactly 3 enemies as requested
     while (this.enemies.length < 3) {
@@ -170,6 +168,18 @@ export class GameScreen extends Screen {
 
     if (inputManager.isActiveAction('CAM_L')) this.cameraYaw -= 2.5 * (ts / 1000);
     if (inputManager.isActiveAction('CAM_R')) this.cameraYaw += 2.5 * (ts / 1000);
+    
+    // Auto-Align Camera behind tank when moving
+    if (Math.abs(this.tank.velocity) > 1.0) {
+        const targetYaw = this.tank.rotation;
+        let diff = ((targetYaw - this.cameraYaw) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+        if (diff > Math.PI) diff -= Math.PI * 2;
+        
+        // Faster auto-align for better tracking
+        const autoAlignSpeed = 2.0 * (ts / 1000);
+        this.cameraYaw += Math.sign(diff) * Math.min(Math.abs(diff), autoAlignSpeed);
+    }
+
     if (inputManager.isActiveAction('CAM_Z_IN')) this.cameraDistance = Math.max(5, this.cameraDistance - 10 * (ts / 1000));
     if (inputManager.isActiveAction('CAM_Z_OUT')) this.cameraDistance = Math.min(40, this.cameraDistance + 10 * (ts / 1000));
 
@@ -271,7 +281,7 @@ export class GameScreen extends Screen {
         let shakeX = 0, shakeY = 0, shakeZ = 0;
         const totalRecoil = this.tank.shellRecoil + this.tank.grenadeRecoil * 0.5 + this.tank.recoil * 0.5;
         if (totalRecoil > 0) {
-            const mag = totalRecoil * 0.15;
+            const mag = totalRecoil * 0.1; // Reduced shake
             shakeX = (Math.random() - 0.5) * mag;
             shakeY = (Math.random() - 0.5) * mag;
             shakeZ = (Math.random() - 0.5) * mag;
@@ -303,14 +313,6 @@ export class GameScreen extends Screen {
     this.level.draw(camPos);
     this.tank.draw(this.cameraYaw);
     
-    // Draw Laser Sight
-    if (this.tank.hp > 0) {
-        const barrelMat = this.tank.barrel.getTransformMatrix();
-        const laserOffset = UT.MAT4_TRANSLATE(0, 0, -51.125); // Start at tip, extend forward
-        const laserMat = UT.MAT4_MULTIPLY(barrelMat, laserOffset);
-        gfx3MeshRenderer.drawMesh(this.laserMesh, laserMat);
-    }
-
     for (const enemy of this.enemies) {
        enemy.draw(this.cameraYaw);
     }

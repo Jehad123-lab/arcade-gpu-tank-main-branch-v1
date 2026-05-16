@@ -14,7 +14,8 @@ A log of all tasks, ideas, and progress for this project.
 
 ## Done
 
--   **[2026-05-16 09:10]**: Improved aiming mechanics: Increased turret traverse speed from 1.5 to 4.5 rad/s for faster target acquisition. Added a visible red laser sight originating from the barrel tip to assist in precise aiming.
+-   **[2026-05-16 09:15]**: Removed visible laser sight as requested. Implemented "Smart Follow" camera that automatically aligns behind the tank during movement while allowing manual orbit overrides.
+-   **[2026-05-16 09:10]**: Improved aiming mechanics: Increased turret traverse speed from 1.5 to 4.5 rad/s for faster target acquisition. Added a visible red laser sight originating from the barrel tip to assist in precise aiming. (DEPRECATED Laser)
 -   **[2026-05-16 09:05]**: Fixed camera jitter by refactoring `GameScreen.ts` to use higher-order interpolation and stabilized target tracking. Improved tank controls in `Tank.ts` with momentum-based rotation and refined physics force application for a more responsive arcade feel.
 -   **[2026-05-16 08:58]**: Fixed "Tanks in the ground" issue by aligning visual mesh origins with physics centers in `Tank.ts` and `Enemy.ts`. Fixed Camera and fire consistency by tracking physics position directly instead of stale mesh transforms.
 -   **[2026-05-16 07:40]**: Fixed "Tank Deformation" when turning (A/D) by refactoring component synchronization to use a strict matrix hierarchy (`bodyMatrix` parent). Replaced manual vector math with `UT.MAT4_MULTIPLY` chains.

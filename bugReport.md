@@ -17,7 +17,8 @@ Tracking all issues, from critical bugs to minor suggestions.
 -   **[RESOLVED] CAMERA TRACKING**: Camera tracked stale mesh positions. Fixed by tracking physics bodies directly.
 -   **[RESOLVED] CAMERA JITTER**: Refactored camera orbit interpolation to eliminate micro-shaking.
 -   **[RESOLVED] TANK HANDLING**: Added momentum and improved steering responsiveness.
--   **[RESOLVED] AIMING DIFFICULTY**: Increased turret traverse speed and added red laser pointer for visual guidance.
+-   **[RESOLVED] AIMING DIFFICULTY**: Increased turret traverse speed and added red laser pointer for visual guidance. (Laser removed later per feedback).
+-   **[RESOLVED] CAMERA AUTO-FOLLOW**: Camera now intelligently follows tank movement direction for easier navigation.
 
 ## Warning (Unexpected Behavior)
 
