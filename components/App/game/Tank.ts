@@ -64,7 +64,7 @@ export class Tank {
       x: 0, y: 0.8, z: 0,
       motionType: Gfx3Jolt.EMotionType_Dynamic,
       layer: JOLT_LAYER_MOVING,
-      settings: { mAngularDamping: 50.0, mMassPropertiesOverride: 500.0 }
+      settings: { mAngularDamping: 5.0, mMassPropertiesOverride: 800.0 }
     });
   }
 
@@ -119,27 +119,40 @@ export class Tank {
     
     // Steering Logic with momentum and speed-sensitivity
     const speedFactor = Math.abs(this.velocity) / speed;
-    // Turn faster when slow (pivot), wider turns when fast
-    const baseRotSpeed = rotSpeed * (1.0 - speedFactor * 0.4); 
-    const targetRotSpeed = -moveDir.x * baseRotSpeed;
-    const rotAlpha = 1.0 - Math.exp(-8.0 * (ts / 1000));
+    const baseRotSpeed = rotSpeed * (1.0 - speedFactor * 0.5); 
+    const targetTurnVelocity = -moveDir.x * baseRotSpeed;
     
-    // Add a small rotation boost when stationary for pivot turns
-    const pivotBoost = Math.abs(this.velocity) < 1.0 ? 1.5 : 1.0;
-    this.rotation += targetRotSpeed * pivotBoost * rotAlpha * (ts / 1000) * 10; 
+    // Use target angular velocity instead of accumulator to allow physics interactions
+    const angVel = this.physicsBody.body.GetAngularVelocity();
+    const turnAlpha = 1.0 - Math.exp(-10.0 * (ts / 1000));
+    const newAngVelY = UT.LERP(angVel.GetY(), targetTurnVelocity, turnAlpha);
+    
+    gfx3JoltManager.bodyInterface.SetAngularVelocity(
+      this.physicsBody.body.GetID(), 
+      new Gfx3Jolt.Vec3(0, newAngVelY, 0)
+    );
     
     const throttle = moveDir.y;
     const isBraking = (throttle > 0 && this.velocity < 0) || (throttle < 0 && this.velocity > 0);
     const targetVelocity = throttle * speed;
     
     // Snappier acceleration, very fast braking
-    const baseAccel = throttle !== 0 ? (isBraking ? -12.0 : -4.0) : -6.0;
+    const baseAccel = throttle !== 0 ? (isBraking ? -15.0 : -5.0) : -8.0;
     const accelAlpha = 1.0 - Math.exp(baseAccel * (ts / 1000));
     this.velocity = UT.LERP(this.velocity, targetVelocity, accelAlpha);
 
     // Physics Update
     const pos = this.physicsBody.body.GetPosition();
-    let quat = Quaternion.createFromEuler(this.rotation, 0, 0, 'YXZ');
+    const qPhysics = this.physicsBody.body.GetRotation();
+    const currentQuat = new Quaternion(qPhysics.GetW(), qPhysics.GetX(), qPhysics.GetY(), qPhysics.GetZ());
+    
+    // Update our internal rotation from physics to stay in sync with collisions
+    // Extract yaw from forward vector for robustness
+    const forwardVec = currentQuat.rotateVector([0, 0, -1]);
+    this.rotation = Math.atan2(forwardVec[0], -forwardVec[2]);
+
+    // Calculate ground-aligned orientation for movement (visual only banking)
+    let quat = currentQuat;
     
     // Cast rays from 4 corners down to find the ground normal for smooth banking
     const hw = 1.4; // Half-width
@@ -157,11 +170,10 @@ export class Tank {
     const getHitPoint = (dx: number, dz: number): vec3 => {
       const wx = cx + rx * dx + fx * dz;
       const wz = cz + rz * dx + fz * dz;
-      const ray = gfx3JoltManager.createRay(wx, cy, wz, wx, cy - 3.0, wz);
+      const ray = gfx3JoltManager.createRay(wx, cy + 0.5, wz, wx, cy - 3.0, wz);
       if (ray.fraction < 1.0 && ray.normal && ray.normal.GetY() > 0.5) {
-        return [wx, cy - ray.fraction * 3.0, wz];
+        return [wx, cy + 0.5 - ray.fraction * 3.5, wz];
       }
-      // If no valid ground hit, assume the ground is flat at cy - 0.5
       return [wx, cy - 0.5, wz]; 
     };
 
@@ -194,32 +206,27 @@ export class Tank {
     const up: vec3 = [0, 1, 0];
     let axis = UT.VEC3_CROSS(up, this.currentUp);
     const dot = UT.VEC3_DOT(up, this.currentUp);
-    // Only align if there's a valid angle
     if (UT.VEC3_LENGTH(axis) > 0.001 && Math.abs(dot) < 0.999) {
         axis = UT.VEC3_NORMALIZE(axis);
         const clampedDot = Math.max(-1, Math.min(1, dot));
         const angle = Math.acos(clampedDot);
         const alignQ = Quaternion.createFromAxisAngle(axis, angle);
-        quat = alignQ.mul(quat.w, quat.x, quat.y, quat.z); // Multiply align * yaw
+        quat = alignQ.mul(quat.w, quat.x, quat.y, quat.z);
     }
 
-    const physicsQuat = Quaternion.createFromEuler(this.rotation, 0, 0, 'YXZ');
-    const joltPhysicsQuat = new Gfx3Jolt.Quat(physicsQuat.x, physicsQuat.y, physicsQuat.z, physicsQuat.w);
-    gfx3JoltManager.bodyInterface.SetRotation(this.physicsBody.body.GetID(), joltPhysicsQuat, Gfx3Jolt.EActivation_Activate);
-    gfx3JoltManager.bodyInterface.SetAngularVelocity(this.physicsBody.body.GetID(), new Gfx3Jolt.Vec3(0, 0, 0));
-
-    // Physics Movement Update (using ground-aligned orientation for movement directions)
-    const forwardVec = quat.rotateVector([0, 0, -1]);
-    const linVel = UT.VEC3_SCALE(forwardVec, this.velocity);
+    // Physics Movement Update
+    const forwardVecActual = currentQuat.rotateVector([0, 0, -1]);
+    const linVel = UT.VEC3_SCALE(forwardVecActual, this.velocity);
     const curVel = this.physicsBody.body.GetLinearVelocity();
     
+    // Adjust forces to be more "Heavy" but "Direct"
     const mass = 500.0;
     const velDiffX = linVel[0] - curVel.GetX();
     const velDiffY = linVel[1] - curVel.GetY();
     const velDiffZ = linVel[2] - curVel.GetZ();
     
     const kp = 25.0; 
-    const maxForce = 45000.0;
+    const maxForce = 25000.0; // Slightly lower max force for smoother accel
     const forceX = Math.max(-maxForce, Math.min(maxForce, velDiffX * mass * kp));
     const forceY = Math.max(-maxForce, Math.min(maxForce, velDiffY * mass * kp));
     const forceZ = Math.max(-maxForce, Math.min(maxForce, velDiffZ * mass * kp));

@@ -14,6 +14,8 @@ A log of all tasks, ideas, and progress for this project.
 
 ## Done
 
+-   **[2026-05-16 09:35]**: Fixed critical crash `TypeError: currentQuat.toEuler is not a function` by implementing manual yaw extraction from the forward vector.
+-   **[2026-05-16 09:31]**: Major steering overhaul: Switched from "Warp-based" rotation to physics-based `SetAngularVelocity` for realistic hull collisions and momentum. Implemented "Manual Override" for the auto-follow camera, which pauses alignment during active aiming to prevent camera fighting. Increased tank mass and refined forces for a "Heavy Arcade" feel inspired by modern tank sims.
 -   **[2026-05-16 09:22]**: Implemented "Modern Arcade" control suite: Added speed-sensitive steering (tighter pivot turns, wider high-speed turns), responsive braking momentum, and a "Dynamic Swing" auto-follow camera that mimics vehicle physics. Increased camera height for better tactical awareness.
 -   **[2026-05-16 09:15]**: Removed visible laser sight as requested. Implemented "Smart Follow" camera that automatically aligns behind the tank during movement while allowing manual orbit overrides.
 -   **[2026-05-16 09:10]**: Improved aiming mechanics: Increased turret traverse speed from 1.5 to 4.5 rad/s for faster target acquisition. Added a visible red laser sight originating from the barrel tip to assist in precise aiming. (DEPRECATED Laser)

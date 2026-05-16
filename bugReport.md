@@ -20,6 +20,9 @@ Tracking all issues, from critical bugs to minor suggestions.
 -   **[RESOLVED] AIMING DIFFICULTY**: Increased turret traverse speed and added red laser pointer for visual guidance. (Laser removed later per feedback).
 -   **[RESOLVED] CAMERA AUTO-FOLLOW**: Camera now intelligently follows tank movement direction for easier navigation.
 -   **[RESOLVED] ARCADE PHYSICS**: Controls now feature speed-sensitive steering and snappy braking/acceleration.
+-   **[RESOLVED] EULER CRASH**: Fixed `toEuler` not a function error in `Tank.ts` and `Enemy.ts`.
+-   **[RESOLVED] PHYSICS STEERING**: Refactored hull rotation to use angular velocity, allowing realistic environmental interactions and "bounce" during collisions.
+-   **[RESOLVED] AIMING STABILITY**: Camera auto-follow now respects manual interaction, preventing the viewpoint from snapping while the player is actively tracking targets.
 -   **[RESOLVED] CAMERA SMOOTHING**: Refined interpolation for a better "Modern Arcade" tactical view.
 
 ## Warning (Unexpected Behavior)

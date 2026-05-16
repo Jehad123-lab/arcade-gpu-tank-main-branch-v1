@@ -85,13 +85,16 @@ export class Enemy {
       x, y: y + 0.4, z,
       motionType: Gfx3Jolt.EMotionType_Dynamic,
       layer: JOLT_LAYER_MOVING,
-      settings: { mAngularDamping: 50.0, mMassPropertiesOverride: 500.0 }
+      settings: { mAngularDamping: 5.0, mMassPropertiesOverride: 500.0 }
     });
   }
 
 
   update(ts: number, targetPos: any): { didShoot: boolean, muzzlePos?: vec3, dir?: vec3 } {
     if (this.hp <= 0) return { didShoot: false };
+
+    const speed = 10;
+    const rotSpeed = 2.5;
 
     this.recoil -= (ts / 1000) * 5; 
     if (this.recoil < 0) this.recoil = 0;
@@ -100,6 +103,12 @@ export class Enemy {
 
     // Jolt Logic
     const pos = this.physicsBody.body.GetPosition();
+    const qPhysics = this.physicsBody.body.GetRotation();
+    const currentQuat = new Quaternion(qPhysics.GetW(), qPhysics.GetX(), qPhysics.GetY(), qPhysics.GetZ());
+    
+    const forwardVec = currentQuat.rotateVector([0, 0, -1]);
+    this.rotation = Math.atan2(forwardVec[0], -forwardVec[2]);
+
     const myPos = JOLT_RVEC3_TO_VEC3(pos);
     const dx = targetPos[0] - myPos[0];
     const dz = targetPos[2] - myPos[2];
@@ -111,10 +120,12 @@ export class Enemy {
     if (angleDiff > Math.PI) angleDiff -= PI2;
     if (angleDiff < -Math.PI) angleDiff += PI2;
     
-    const rotSpeed = 2.0;    
-    this.rotation += Math.sign(angleDiff) * Math.min(Math.abs(angleDiff), rotSpeed * (ts / 1000));
+    const turnVel = Math.sign(angleDiff) * Math.min(Math.abs(angleDiff) * 5.0, rotSpeed);
+    const turnAlpha = 1.0 - Math.exp(-8.0 * (ts / 1000));
+    const curAngVel = this.physicsBody.body.GetAngularVelocity();
+    gfx3JoltManager.bodyInterface.SetAngularVelocity(this.physicsBody.body.GetID(), new Gfx3Jolt.Vec3(0, UT.LERP(curAngVel.GetY(), turnVel, turnAlpha), 0));
 
-    let quat = Quaternion.createFromEuler(this.rotation, 0, 0, 'YXZ');
+    let quat = currentQuat;
     
     // Smooth banking
     let targetUp: vec3 = [0, 1, 0];
@@ -139,13 +150,7 @@ export class Enemy {
 
     this.visualQuat = quat;
 
-    const physicsQuat = Quaternion.createFromEuler(this.rotation, 0, 0, 'YXZ');
-    const joltPhysicsQuat = new Gfx3Jolt.Quat(physicsQuat.x, physicsQuat.y, physicsQuat.z, physicsQuat.w);
-    gfx3JoltManager.bodyInterface.SetRotation(this.physicsBody.body.GetID(), joltPhysicsQuat, Gfx3Jolt.EActivation_Activate);
-    gfx3JoltManager.bodyInterface.SetAngularVelocity(this.physicsBody.body.GetID(), new Gfx3Jolt.Vec3(0, 0, 0));
-
     // Physics Movement Update
-    const speed = 10;
     let throttle = 0;
     if (dist > 15) {
         throttle = 1; 
@@ -153,7 +158,7 @@ export class Enemy {
         throttle = -0.5; 
     }
 
-    const forward = quat.rotateVector([0, 0, -1]);
+    const forward = currentQuat.rotateVector([0, 0, -1]);
     const linVel = UT.VEC3_SCALE(forward, throttle * speed);
     const curVel = this.physicsBody.body.GetLinearVelocity();
     

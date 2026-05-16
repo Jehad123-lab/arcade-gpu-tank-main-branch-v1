@@ -63,6 +63,7 @@ export class GameScreen extends Screen {
   isReady: boolean = false;
   cameraLookTarget: vec3 = [0, 0, 0];
   rightClickFire: boolean = false;
+  lastMouseManualTS: number = 0;
   
   constructor() {
     super();
@@ -100,6 +101,7 @@ export class GameScreen extends Screen {
     if (e.button === 2) { // Right click
       if (inputManager.isPointerLockCaptured()) {
          this.rightClickFire = true;
+         this.lastMouseManualTS = Date.now();
       }
     }
   };
@@ -135,10 +137,6 @@ export class GameScreen extends Screen {
     inputManager.registerAction('keyboard', 'KeyG', 'FIRE_ALT'); 
     inputManager.registerAction('keyboard', 'ShiftLeft', 'FIRE_ALT'); 
     inputManager.registerAction('keyboard', 'KeyE', 'FIRE_ALT'); 
-    // Mouse button mapping is handled via isMouseDown for Left, 
-    // but we can register if we have button indices in InputSource, but currently we don't.
-    // However handleGlobalPointerDown handles right click. 
-    // Let's add Shift for grenade.
 
     inputManager.setPointerLockEnabled(true);
     eventManager.subscribe(inputManager, 'E_MOUSE_MOVE', this, this.handleMouseMove);
@@ -156,6 +154,7 @@ export class GameScreen extends Screen {
     if (inputManager.isPointerLockCaptured() || inputManager.isMouseDown()) {
        this.cameraYaw -= data.movementX * 0.005;
        this.cameraPitch += data.movementY * 0.005;
+       this.lastMouseManualTS = Date.now();
        
        // Limit pitch to avoid flipping over and going way below ground
        this.cameraPitch = Math.max(-0.1, Math.min(Math.PI / 2 - 0.1, this.cameraPitch));
@@ -166,18 +165,24 @@ export class GameScreen extends Screen {
     inputManager.update(ts);
     gfx3JoltManager.update(ts);
 
-    if (inputManager.isActiveAction('CAM_L')) this.cameraYaw -= 2.5 * (ts / 1000);
-    if (inputManager.isActiveAction('CAM_R')) this.cameraYaw += 2.5 * (ts / 1000);
+    if (inputManager.isActiveAction('CAM_L')) {
+        this.cameraYaw -= 2.5 * (ts / 1000);
+        this.lastMouseManualTS = Date.now();
+    }
+    if (inputManager.isActiveAction('CAM_R')) {
+        this.cameraYaw += 2.5 * (ts / 1000);
+        this.lastMouseManualTS = Date.now();
+    }
     
     // Flexible Auto-Align Camera behind tank when moving
-    if (Math.abs(this.tank.velocity) > 2.0) {
+    // Only kick in if user hasn't moved mouse for 1.5 seconds
+    const now = Date.now();
+    if (now - this.lastMouseManualTS > 1500 && Math.abs(this.tank.velocity) > 2.0) {
         const targetYaw = this.tank.rotation;
         let diff = ((targetYaw - this.cameraYaw) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
         if (diff > Math.PI) diff -= Math.PI * 2;
         
-        // Use a dynamic alignment speed that increases with the angle difference
-        // This gives a nice "swinging" feel rather than a robotic snap
-        const alignmentIntensity = UT.LERP(0.5, 3.0, Math.min(1.0, Math.abs(diff) / (Math.PI / 4)));
+        const alignmentIntensity = UT.LERP(0.4, 2.0, Math.min(1.0, Math.abs(diff) / (Math.PI / 2)));
         const autoAlignSpeed = alignmentIntensity * (ts / 1000);
         this.cameraYaw += Math.sign(diff) * Math.min(Math.abs(diff), autoAlignSpeed);
     }
