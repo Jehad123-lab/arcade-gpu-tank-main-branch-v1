@@ -119,13 +119,13 @@ export class Tank {
     
     // Steering Logic with momentum and speed-sensitivity
     const speedFactor = Math.abs(this.velocity) / speed;
-    const baseRotSpeed = rotSpeed * (1.0 - speedFactor * 0.5); 
-    const targetTurnVelocity = -moveDir.x * baseRotSpeed;
+    const baseRotSpeed = rotSpeed * (1.0 - speedFactor * 0.4); 
+    const targetTurnVelocity = moveDir.x * baseRotSpeed; // Simplified: pressing right should turn clockwise (negative Y angular velocity)
     
     // Use target angular velocity instead of accumulator to allow physics interactions
     const angVel = this.physicsBody.body.GetAngularVelocity();
-    const turnAlpha = 1.0 - Math.exp(-10.0 * (ts / 1000));
-    const newAngVelY = UT.LERP(angVel.GetY(), targetTurnVelocity, turnAlpha);
+    const turnAlpha = 1.0 - Math.exp(-20.0 * (ts / 1000)); // Even snappier steering
+    const newAngVelY = UT.LERP(angVel.GetY(), -targetTurnVelocity, turnAlpha);
     
     gfx3JoltManager.bodyInterface.SetAngularVelocity(
       this.physicsBody.body.GetID(), 
@@ -137,7 +137,7 @@ export class Tank {
     const targetVelocity = throttle * speed;
     
     // Snappier acceleration, very fast braking
-    const baseAccel = throttle !== 0 ? (isBraking ? -15.0 : -5.0) : -8.0;
+    const baseAccel = throttle !== 0 ? (isBraking ? -30.0 : -12.0) : -15.0; // Snappier response
     const accelAlpha = 1.0 - Math.exp(baseAccel * (ts / 1000));
     this.velocity = UT.LERP(this.velocity, targetVelocity, accelAlpha);
 
@@ -147,17 +147,18 @@ export class Tank {
     const currentQuat = new Quaternion(qPhysics.GetW(), qPhysics.GetX(), qPhysics.GetY(), qPhysics.GetZ());
     
     // Update our internal rotation from physics to stay in sync with collisions
-    // Extract yaw from forward vector for robustness
+    // Extract yaw from forward vector: Yaw is angle around Y
     const forwardVec = currentQuat.rotateVector([0, 0, -1]);
-    this.rotation = Math.atan2(forwardVec[0], -forwardVec[2]);
+    this.rotation = Math.atan2(-forwardVec[0], -forwardVec[2]); // Standard: atan2(-x, -z) for rotation where North is [0, 0, -1]
 
     // Calculate ground-aligned orientation for movement (visual only banking)
     let quat = currentQuat;
     
     // Cast rays from 4 corners down to find the ground normal for smooth banking
-    const hw = 1.4; // Half-width
-    const hd = 1.6; // Half-depth
+    const hw = 1.5; // Half-width
+    const hd = 1.8; // Half-depth
 
+    // Use current physics rotation for raycast orientation
     const sinYaw = Math.sin(this.rotation);
     const cosYaw = Math.cos(this.rotation);
     const fx = -sinYaw, fz = -cosYaw;
@@ -220,13 +221,13 @@ export class Tank {
     const curVel = this.physicsBody.body.GetLinearVelocity();
     
     // Adjust forces to be more "Heavy" but "Direct"
-    const mass = 500.0;
+    const mass = 1000.0; // Heavier tank
     const velDiffX = linVel[0] - curVel.GetX();
     const velDiffY = linVel[1] - curVel.GetY();
     const velDiffZ = linVel[2] - curVel.GetZ();
     
-    const kp = 25.0; 
-    const maxForce = 25000.0; // Slightly lower max force for smoother accel
+    const kp = 40.0; // Higher KP for snappier acceleration
+    const maxForce = 50000.0; 
     const forceX = Math.max(-maxForce, Math.min(maxForce, velDiffX * mass * kp));
     const forceY = Math.max(-maxForce, Math.min(maxForce, velDiffY * mass * kp));
     const forceZ = Math.max(-maxForce, Math.min(maxForce, velDiffZ * mass * kp));

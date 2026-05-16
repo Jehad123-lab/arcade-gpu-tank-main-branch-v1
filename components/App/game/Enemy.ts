@@ -107,7 +107,7 @@ export class Enemy {
     const currentQuat = new Quaternion(qPhysics.GetW(), qPhysics.GetX(), qPhysics.GetY(), qPhysics.GetZ());
     
     const forwardVec = currentQuat.rotateVector([0, 0, -1]);
-    this.rotation = Math.atan2(forwardVec[0], -forwardVec[2]);
+    this.rotation = Math.atan2(-forwardVec[0], -forwardVec[2]);
 
     const myPos = JOLT_RVEC3_TO_VEC3(pos);
     const dx = targetPos[0] - myPos[0];

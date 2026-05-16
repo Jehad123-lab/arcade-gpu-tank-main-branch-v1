@@ -141,8 +141,11 @@ export class GameScreen extends Screen {
     inputManager.setPointerLockEnabled(true);
     eventManager.subscribe(inputManager, 'E_MOUSE_MOVE', this, this.handleMouseMove);
 
-    this.camera.setPosition(0, 10, -10);
+    this.camera.setPosition(0, 10, 18); // Start at cy=0 position offset (0, 10, distance)
     this.camera.lookAt(0, 0, 0);
+    this.cameraYaw = 0;
+    this.cameraPitch = 0.45;
+    this.cameraDistance = 18;
     this.camera.getView().setBgColor(0.53, 0.81, 0.92, 1.0); // Sky blue
     
     const tankP = this.tank.physicsBody.body.GetPosition();
