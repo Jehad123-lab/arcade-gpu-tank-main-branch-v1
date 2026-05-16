@@ -141,8 +141,8 @@ export class Tank {
     );
     
     // FORWARD MOVEMENT LOGIC
-    // Aligning with user feedback: W should move towards the mesh's front (+Z)
-    const throttle = moveDir.y; 
+    // W should move Forward. User reports: "w means backward and s means front".
+    const throttle = -moveDir.y; 
     const isBraking = (throttle > 0 && this.velocity < 0) || (throttle < 0 && this.velocity > 0);
     const targetVelocity = throttle * speed;
     
@@ -156,7 +156,7 @@ export class Tank {
     const qPhysics = this.physicsBody.body.GetRotation();
     const currentQuat = new Quaternion(qPhysics.GetW(), qPhysics.GetX(), qPhysics.GetY(), qPhysics.GetZ());
     
-    // Use [0, 0, 1] as Forward for both Mesh and Physics consistency
+    // Extract Yaw from current physics orientation
     const forwardVec = currentQuat.rotateVector([0, 0, 1]);
     this.rotation = Math.atan2(-forwardVec[0], -forwardVec[2]);
 
@@ -308,7 +308,7 @@ export class Tank {
     const pitchQ = Quaternion.createFromEuler(0, -clampedPitch, 0, 'YXZ');
 
     const visualRecoilValue = this.shellRecoil > 0 ? this.shellRecoil * 0.45 : 0;
-    const barrelPivotMatrix = UT.MAT4_MULTIPLY(turretMatrix, UT.MAT4_TRANSLATE(0, 0.1, 1.2 - visualRecoilValue));
+    const barrelPivotMatrix = UT.MAT4_MULTIPLY(turretMatrix, UT.MAT4_TRANSLATE(0, 0.1, -1.2 + visualRecoilValue));
     const barrelMatrix = UT.MAT4_MULTIPLY(barrelPivotMatrix, pitchQ.toMatrix4());
     this.barrel.enableManualTransform(barrelMatrix);
     
@@ -323,12 +323,12 @@ export class Tank {
 
     // Calculate Muzzle Pos & Dir from barrelMatrix
     // Muzzle is at local [0, 0, -1.125] relative to barrel center
-    const muzzleLocalPos = [0, 0, 1.125, 1];
+    const muzzleLocalPos = [0, 0, -1.125, 1];
     const muzzleWorldPosVec4 = UT.MAT4_MULTIPLY_BY_VEC4(barrelMatrix, muzzleLocalPos);
     const muzzleWorldPos: vec3 = [muzzleWorldPosVec4[0], muzzleWorldPosVec4[1], muzzleWorldPosVec4[2]];
     
-    // Direction is forward of barrelMatrix [0, 0, 1]
-    const muzzleWorldDirVec4 = UT.MAT4_MULTIPLY_BY_VEC4(barrelMatrix, [0, 0, 1, 0]);
+    // Direction is forward of barrelMatrix [0, 0, -1]
+    const muzzleWorldDirVec4 = UT.MAT4_MULTIPLY_BY_VEC4(barrelMatrix, [0, 0, -1, 0]);
     const muzzleWorldDir = UT.VEC3_NORMALIZE([muzzleWorldDirVec4[0], muzzleWorldDirVec4[1], muzzleWorldDirVec4[2]]);
     
     return { 

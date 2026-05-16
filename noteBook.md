@@ -14,6 +14,7 @@ A log of all tasks, ideas, and progress for this project.
 
 ## Done
 
+-   **[2026-05-16 10:50]**: Fixed barrel inversion. Realigned mesh offsets to negative Z-axis (standard mesh forward) while maintaining positive Z as the world movement forward. Corrected player throttle mapping to fix W/S inversion (W=Forward).
 -   **[2026-05-16 10:45]**: Fixed tank tilting and collision issues. Implemented a "Spring Torque" stabilization system to pull physics bodies upright smoothly without jitter. Lowered the tank's center of mass (mCenterOfMassOffset) and increased collision volume height (1.2m) to prevent clipping into the ground. Standardized visual banking to be more conservative.
 -   **[2026-05-16 10:39]**: Final Stability & Control Standardisation: Fixed control inversion by standardizing the forward axis as `[0, 0, 1]` across player and AI. Switched to an extremely heavy physics model (8000 mass) with high damping (20.0 angular) to eliminate all jitter. Removed all physics rotation overrides (`SetRotation`) that caused shaking.
 -   **[2026-05-16 10:24]**: Fixed high-frequency tank shaking/jitter. Removed frame-by-frame `SetRotation` overrides on the physics body, switching to high angular damping for stability. Implemented exponential smoothing for all velocity updates (Player & AI) to prevent solver oscillation. Smoothed visual banking logic to better handle terrain bumps.

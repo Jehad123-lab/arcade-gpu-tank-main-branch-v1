@@ -209,12 +209,12 @@ export class Enemy {
   }
   
   getMuzzleData(q: Quaternion): { muzzlePos: vec3, dir: vec3 } {
-    const direction = q.rotateVector([0, 0, 1]); 
+    const direction = q.rotateVector([0, 0, -1]); 
     const currentRot = this.physicsBody.body.GetRotation();
     const bodyQ = new Quaternion(currentRot.GetW(), currentRot.GetX(), currentRot.GetY(), currentRot.GetZ());
     
     const visualRecoil = this.recoil > 0 ? this.recoil * 0.3 : 0;
-    const barrelRelativePos = bodyQ.rotateVector([0, 0, 0.8 - visualRecoil]);
+    const barrelRelativePos = bodyQ.rotateVector([0, 0, -0.8 + visualRecoil]);
     const pos = this.physicsBody.body.GetPosition();
     const bPos = [pos.GetX() + barrelRelativePos[0], pos.GetY() + 0.45 + barrelRelativePos[1], pos.GetZ() + barrelRelativePos[2]];
 
