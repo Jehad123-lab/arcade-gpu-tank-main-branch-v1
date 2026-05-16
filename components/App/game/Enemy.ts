@@ -85,7 +85,11 @@ export class Enemy {
       x, y: y + 0.4, z,
       motionType: Gfx3Jolt.EMotionType_Dynamic,
       layer: JOLT_LAYER_MOVING,
-      settings: { mAngularDamping: 5.0, mMassPropertiesOverride: 500.0 }
+      settings: { 
+          mAngularDamping: 10.0, 
+          mLinearDamping: 2.0,
+          mMassPropertiesOverride: 1000.0 // Adjusted for enemy size
+      }
     });
   }
 
@@ -106,7 +110,8 @@ export class Enemy {
     const qPhysics = this.physicsBody.body.GetRotation();
     const currentQuat = new Quaternion(qPhysics.GetW(), qPhysics.GetX(), qPhysics.GetY(), qPhysics.GetZ());
     
-    const forwardVec = currentQuat.rotateVector([0, 0, -1]);
+    // Use [0, 0, 1] as Forward if [0, 0, -1] was inverted
+    const forwardVec = currentQuat.rotateVector([0, 0, 1]);
     this.rotation = Math.atan2(-forwardVec[0], -forwardVec[2]);
 
     const myPos = JOLT_RVEC3_TO_VEC3(pos);
@@ -120,21 +125,26 @@ export class Enemy {
     if (angleDiff > Math.PI) angleDiff -= PI2;
     if (angleDiff < -Math.PI) angleDiff += PI2;
     
+    // Steering stability
     const turnVel = Math.sign(angleDiff) * Math.min(Math.abs(angleDiff) * 5.0, rotSpeed);
-    const turnAlpha = 1.0 - Math.exp(-8.0 * (ts / 1000));
+    const turnAlpha = 1.0 - Math.exp(-25.0 * (ts / 1000));
     const curAngVel = this.physicsBody.body.GetAngularVelocity();
-    gfx3JoltManager.bodyInterface.SetAngularVelocity(this.physicsBody.body.GetID(), new Gfx3Jolt.Vec3(0, UT.LERP(curAngVel.GetY(), turnVel, turnAlpha), 0));
+    
+    gfx3JoltManager.bodyInterface.SetAngularVelocity(
+        this.physicsBody.body.GetID(), 
+        new Gfx3Jolt.Vec3(curAngVel.GetX() * 0.2, UT.LERP(curAngVel.GetY(), turnVel, turnAlpha), curAngVel.GetZ() * 0.2)
+    );
 
     let quat = currentQuat;
     
-    // Smooth banking
+    // Smooth visual banking (Mesh only)
     let targetUp: vec3 = [0, 1, 0];
     const ray = gfx3JoltManager.createRay(pos.GetX(), pos.GetY() + 0.5, pos.GetZ(), pos.GetX(), pos.GetY() - 2.0, pos.GetZ());
     if (ray.normal && ray.normal.GetY() > 0.5) {
         targetUp = [ray.normal.GetX(), ray.normal.GetY(), ray.normal.GetZ()];
     }
     
-    this.currentUp = UT.VEC3_LERP(this.currentUp, targetUp, 6.0 * (ts / 1000));
+    this.currentUp = UT.VEC3_LERP(this.currentUp, targetUp, 4.0 * (ts / 1000));
     this.currentUp = UT.VEC3_NORMALIZE(this.currentUp);
 
     const up: vec3 = [0, 1, 0];
@@ -150,7 +160,7 @@ export class Enemy {
 
     this.visualQuat = quat;
 
-    // Physics Movement Update
+    // Movement logic
     let throttle = 0;
     if (dist > 15) {
         throttle = 1; 
@@ -158,14 +168,18 @@ export class Enemy {
         throttle = -0.5; 
     }
 
-    // MOVEMENT STABILITY: Use SetLinearVelocity for arcade feel
-    const forwardVecActual = currentQuat.rotateVector([0, 0, -1]);
+    // MOVEMENT STABILITY: Smoothed velocity matching using [0, 0, 1] as forward
+    const forwardVecActual = currentQuat.rotateVector([0, 0, 1]);
     const currentJoltVel = this.physicsBody.body.GetLinearVelocity();
     const targetLinearVel = UT.VEC3_SCALE(forwardVecActual, throttle * speed);
     
+    const velAlpha = 1.0 - Math.exp(-20.0 * (ts / 1000));
+    const nextVX = UT.LERP(currentJoltVel.GetX(), targetLinearVel[0], velAlpha);
+    const nextVZ = UT.LERP(currentJoltVel.GetZ(), targetLinearVel[2], velAlpha);
+
     gfx3JoltManager.bodyInterface.SetLinearVelocity(
         this.physicsBody.body.GetID(), 
-        new Gfx3Jolt.Vec3(targetLinearVel[0], currentJoltVel.GetY(), targetLinearVel[2])
+        new Gfx3Jolt.Vec3(nextVX, currentJoltVel.GetY(), nextVZ)
     );
     
     let didShoot = false;
@@ -186,12 +200,12 @@ export class Enemy {
   }
   
   getMuzzleData(q: Quaternion): { muzzlePos: vec3, dir: vec3 } {
-    const direction = q.rotateVector([0, 0, -1]); 
+    const direction = q.rotateVector([0, 0, 1]); 
     const currentRot = this.physicsBody.body.GetRotation();
     const bodyQ = new Quaternion(currentRot.GetW(), currentRot.GetX(), currentRot.GetY(), currentRot.GetZ());
     
     const visualRecoil = this.recoil > 0 ? this.recoil * 0.3 : 0;
-    const barrelRelativePos = bodyQ.rotateVector([0, 0, -0.8 + visualRecoil]);
+    const barrelRelativePos = bodyQ.rotateVector([0, 0, 0.8 - visualRecoil]);
     const pos = this.physicsBody.body.GetPosition();
     const bPos = [pos.GetX() + barrelRelativePos[0], pos.GetY() + 0.45 + barrelRelativePos[1], pos.GetZ() + barrelRelativePos[2]];
 

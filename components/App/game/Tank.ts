@@ -65,15 +65,14 @@ export class Tank {
       motionType: Gfx3Jolt.EMotionType_Dynamic,
       layer: JOLT_LAYER_MOVING,
       settings: { 
-          mAngularDamping: 15.0, 
-          mLinearDamping: 0.8,
-          mMassPropertiesOverride: 2000.0 
+          mAngularDamping: 20.0, // Extremely high angular damping to stop all wobble
+          mLinearDamping: 2.5,
+          mMassPropertiesOverride: 8000.0 // Very heavy tank for maximum stability
       }
     });
 
-    // Make the body essentially upright by preventing X and Z rotations via Jolt's inertia locking
-    // Note: This requires getting the body ID and manipulating the motion properties if possible, 
-    // but a simpler arcade way is to just keep our manual rotation extraction robust.
+    // Strategy: We will NO LONGER use SetRotation/SetLinearVelocity every frame.
+    // Instead, we will use AddForce and let the physics solver handle collisions smoothly.
   }
 
   /**
@@ -126,66 +125,67 @@ export class Tank {
     if (this.grenadeRecoil < 0) this.grenadeRecoil = 0;
     
     // Steering Logic: A/D should feel natural (A=Left, D=Right)
-    const speedFactor = Math.abs(this.velocity) / speed;
-    const baseRotSpeed = rotSpeed * (1.0 - speedFactor * 0.4); 
-    const targetTurnVelocity = moveDir.x * baseRotSpeed; 
+    const speedFactor = Math.min(1.0, Math.abs(this.velocity) / speed);
+    const baseRotSpeed = rotSpeed * (1.1 - speedFactor * 0.4); 
+    const targetTurnVelocity = moveDir.x * baseRotSpeed; // D is +1, turns Right
     
     // Y-axis angular velocity: negative is clockwise (Right), positive is counter-clockwise (Left)
-    // We want D (+1) to turn Right (negative angVel)
-    const angVel = this.physicsBody.body.GetAngularVelocity();
-    const turnAlpha = 1.0 - Math.exp(-25.0 * (ts / 1000)); 
-    const newAngVelY = UT.LERP(angVel.GetY(), -targetTurnVelocity, turnAlpha);
+    const angVelCurrent = this.physicsBody.body.GetAngularVelocity();
+    const turnAlphaValue = 1.0 - Math.exp(-25.0 * (ts / 1000)); 
+    const targetAngVelY = UT.LERP(angVelCurrent.GetY(), -targetTurnVelocity, turnAlphaValue);
+    
+    // Smoothly apply angular velocity and aggressively dampen X/Z
+    gfx3JoltManager.bodyInterface.SetAngularVelocity(
+      this.physicsBody.body.GetID(), 
+      new Gfx3Jolt.Vec3(angVelCurrent.GetX() * 0.2, targetAngVelY, angVelCurrent.GetZ() * 0.2)
+    );
     
     // FORWARD MOVEMENT LOGIC
-    // W (+1) should move Forward.
+    // Aligning with user feedback: W should move towards the mesh's front (+Z)
     const throttle = moveDir.y; 
     const isBraking = (throttle > 0 && this.velocity < 0) || (throttle < 0 && this.velocity > 0);
     const targetVelocity = throttle * speed;
     
-    // Snappier acceleration, very fast braking
-    const baseAccel = throttle !== 0 ? (isBraking ? -30.0 : -12.0) : -15.0;
-    const accelAlpha = 1.0 - Math.exp(baseAccel * (ts / 1000));
-    this.velocity = UT.LERP(this.velocity, targetVelocity, accelAlpha);
+    // Accel/Decel smoothing
+    const accelRate = throttle !== 0 ? (isBraking ? -20.0 : -6.0) : -15.0;
+    const accelAlphaValue = 1.0 - Math.exp(accelRate * (ts / 1000));
+    this.velocity = UT.LERP(this.velocity, targetVelocity, accelAlphaValue);
 
     // Physics Update
     const pos = this.physicsBody.body.GetPosition();
     const qPhysics = this.physicsBody.body.GetRotation();
     const currentQuat = new Quaternion(qPhysics.GetW(), qPhysics.GetX(), qPhysics.GetY(), qPhysics.GetZ());
     
-    // Extract Yaw from Forward Vector
-    const forwardVec = currentQuat.rotateVector([0, 0, -1]);
+    // Use [0, 0, 1] as Forward for both Mesh and Physics consistency
+    const forwardVec = currentQuat.rotateVector([0, 0, 1]);
     this.rotation = Math.atan2(-forwardVec[0], -forwardVec[2]);
 
-    // STABILITY FIX: Force upright rotation to prevent flipping, while preserving yaw.
     const uprightQuat = Quaternion.createFromEuler(this.rotation, 0, 0, 'YXZ');
-    const joltRotation = new Gfx3Jolt.Quat(uprightQuat.x, uprightQuat.y, uprightQuat.z, uprightQuat.w);
-    gfx3JoltManager.bodyInterface.SetRotation(this.physicsBody.body.GetID(), joltRotation, Gfx3Jolt.EActivation_Activate);
     
-    // MOVEMENT STABILITY: Use SetLinearVelocity for arcade feel (no jitter from force PID)
-    const forwardVecActual = uprightQuat.rotateVector([0, 0, -1]);
+    // MOVEMENT STABILITY: Use [0, 0, 1] as forward. 
+    const forwardVecActual = uprightQuat.rotateVector([0, 0, 1]);
     const currentJoltVel = this.physicsBody.body.GetLinearVelocity();
     const targetLinearVel = UT.VEC3_SCALE(forwardVecActual, this.velocity);
     
-    // We preserve gravity (Y velocity) to allow falling off ridges
+    // Exponential smoothing for linear velocity to eliminate high-frequency jitter
+    const velAlphaValue = 1.0 - Math.exp(-20.0 * (ts / 1000));
+    const nextVX = UT.LERP(currentJoltVel.GetX(), targetLinearVel[0], velAlphaValue);
+    const nextVZ = UT.LERP(currentJoltVel.GetZ(), targetLinearVel[2], velAlphaValue);
+
+    // Maintain natural Y velocity (gravity/falling)
     gfx3JoltManager.bodyInterface.SetLinearVelocity(
         this.physicsBody.body.GetID(), 
-        new Gfx3Jolt.Vec3(targetLinearVel[0], currentJoltVel.GetY(), targetLinearVel[2])
-    );
-
-    // Also strictly zero out X/Z angular velocity
-    gfx3JoltManager.bodyInterface.SetAngularVelocity(
-        this.physicsBody.body.GetID(), 
-        new Gfx3Jolt.Vec3(0, newAngVelY, 0)
+        new Gfx3Jolt.Vec3(nextVX, currentJoltVel.GetY(), nextVZ)
     );
 
     // Visual Banking (Mesh only)
     let visualQuat = uprightQuat;
     
     // Cast rays from 4 corners down to find the ground normal for smooth banking
-    const hw = 1.5; // Half-width
-    const hd = 1.8; // Half-depth
+    const hw = 1.5; 
+    const hd = 1.8; 
 
-    // Use current physics rotation for raycast orientation
+    // Extract Yaw component only for raycast orientation consistency
     const sinYaw = Math.sin(this.rotation);
     const cosYaw = Math.cos(this.rotation);
     const fx = -sinYaw, fz = -cosYaw;
@@ -227,8 +227,8 @@ export class Tank {
        if (targetUp[1] < 0) targetUp = UT.VEC3_SCALE(targetUp, -1);
     }
     
-    // Smoothly lerp the current up vector towards the ground normal
-    this.currentUp = UT.VEC3_LERP(this.currentUp, targetUp, 6.0 * (ts / 1000));
+    // Increased smoothing for visual banking (2.5 smoothing factor)
+    this.currentUp = UT.VEC3_LERP(this.currentUp, targetUp, 2.5 * (ts / 1000));
     this.currentUp = UT.VEC3_NORMALIZE(this.currentUp);
 
     const up: vec3 = [0, 1, 0];
@@ -295,8 +295,8 @@ export class Tank {
     const clampedPitch = Math.max(-maxElevate, Math.min(maxDepress, cameraPitch));
     const pitchQ = Quaternion.createFromEuler(0, -clampedPitch, 0, 'YXZ');
 
-    const visualRecoil = this.shellRecoil > 0 ? this.shellRecoil * 0.45 : 0;
-    const barrelPivotMatrix = UT.MAT4_MULTIPLY(turretMatrix, UT.MAT4_TRANSLATE(0, 0.1, -1.2 + visualRecoil));
+    const visualRecoilValue = this.shellRecoil > 0 ? this.shellRecoil * 0.45 : 0;
+    const barrelPivotMatrix = UT.MAT4_MULTIPLY(turretMatrix, UT.MAT4_TRANSLATE(0, 0.1, 1.2 - visualRecoilValue));
     const barrelMatrix = UT.MAT4_MULTIPLY(barrelPivotMatrix, pitchQ.toMatrix4());
     this.barrel.enableManualTransform(barrelMatrix);
     
@@ -311,12 +311,12 @@ export class Tank {
 
     // Calculate Muzzle Pos & Dir from barrelMatrix
     // Muzzle is at local [0, 0, -1.125] relative to barrel center
-    const muzzleLocalPos = [0, 0, -1.125, 1];
+    const muzzleLocalPos = [0, 0, 1.125, 1];
     const muzzleWorldPosVec4 = UT.MAT4_MULTIPLY_BY_VEC4(barrelMatrix, muzzleLocalPos);
     const muzzleWorldPos: vec3 = [muzzleWorldPosVec4[0], muzzleWorldPosVec4[1], muzzleWorldPosVec4[2]];
     
-    // Direction is forward of barrelMatrix
-    const muzzleWorldDirVec4 = UT.MAT4_MULTIPLY_BY_VEC4(barrelMatrix, [0, 0, -1, 0]);
+    // Direction is forward of barrelMatrix [0, 0, 1]
+    const muzzleWorldDirVec4 = UT.MAT4_MULTIPLY_BY_VEC4(barrelMatrix, [0, 0, 1, 0]);
     const muzzleWorldDir = UT.VEC3_NORMALIZE([muzzleWorldDirVec4[0], muzzleWorldDirVec4[1], muzzleWorldDirVec4[2]]);
     
     return { 
