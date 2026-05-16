@@ -14,6 +14,7 @@ A log of all tasks, ideas, and progress for this project.
 
 ## Done
 
+-   **[2026-05-16 07:40]**: Fixed "Tank Deformation" when turning (A/D) by refactoring component synchronization to use a strict matrix hierarchy (`bodyMatrix` parent). Replaced manual vector math with `UT.MAT4_MULTIPLY` chains.
 -   **[2026-05-16 07:35]**: Fixed `TypeError: Cannot read properties of undefined (reading 'setPosition')` in `Tank.ts` caused by calling `setPosition` on an undefined `group` property. Synced all tank meshes to a calculated `origin` instead.
 -   **[2026-05-16 07:30]**: Implemented "Modern Arcade" stability system. Separated vertical physics orientation (Pitch/Roll locked to 0) from visual banking. Lifted physics bodies (0.35m cushion) to prevent terrain snags. Increased mass (500) and angular damping (50) for premium weighty feel.
 -   **[2026-05-16 07:20]**: Fixed `gfx3JoltManager.bodyInterface.SetAllowedDOFs is not a function` error by using `body.GetMotionProperties().SetAllowedDOFs(63)` instead.  

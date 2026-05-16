@@ -219,29 +219,27 @@ export class Tank {
     const q = quat;
     const origin: vec3 = [pos.GetX(), pos.GetY() - 0.35, pos.GetZ()];
 
-    this.body.setPosition(origin[0], origin[1], origin[2]);
-    this.body.setQuaternion(q);
+    // Root Body Matrix
+    const bodyMatrix = UT.MAT4_TRANSFORM(origin, [0, 0, 0], [1, 1, 1], q);
+    
+    // Body Mesh
+    this.body.enableManualTransform(bodyMatrix);
 
-    // Component Offsets
-    const trackOffsetL = q.rotateVector([-1.425, -0.15, 0]);
-    this.trackL.setPosition(origin[0] + trackOffsetL[0], origin[1] + trackOffsetL[1], origin[2] + trackOffsetL[2]);
-    this.trackL.setQuaternion(q);
+    // Helper for rigid attachment
+    const syncRigid = (mesh: Gfx3Mesh, localPos: vec3) => {
+        const localMatrix = UT.MAT4_TRANSFORM(localPos, [0, 0, 0], [1, 1, 1], new Quaternion());
+        mesh.enableManualTransform(UT.MAT4_MULTIPLY(bodyMatrix, localMatrix));
+    };
 
-    const trackOffsetR = q.rotateVector([1.425, -0.15, 0]);
-    this.trackR.setPosition(origin[0] + trackOffsetR[0], origin[1] + trackOffsetR[1], origin[2] + trackOffsetR[2]);
-    this.trackR.setQuaternion(q);
+    syncRigid(this.trackL, [-1.425, -0.15, 0]);
+    syncRigid(this.trackR, [1.425, -0.15, 0]);
+    syncRigid(this.engine, [0, 0.3, 1.8]);
 
-    const engineOffset = q.rotateVector([0, 0.3, 1.8]);
-    this.engine.setPosition(origin[0] + engineOffset[0], origin[1] + engineOffset[1], origin[2] + engineOffset[2]);
-    this.engine.setQuaternion(q);
-
-    // Turret follows body tilt but has independent yaw
-    // We want the turret to smoothly turn to face cameraYaw.
-    // Calculate the shortest angle path
+    // Turret Logic
     let yawDiff = ((cameraYaw - this.turretYaw) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
     if (yawDiff > Math.PI) yawDiff -= Math.PI * 2;
     
-    const turretTraverseSpeed = 1.5; // rad per second
+    const turretTraverseSpeed = 1.5;
     const traverseAmount = turretTraverseSpeed * (ts / 1000);
     
     if (Math.abs(yawDiff) < traverseAmount) {
@@ -252,36 +250,30 @@ export class Tank {
     
     const localYaw = (this.turretYaw - this.rotation);
     const localYawQ = Quaternion.createFromEuler(localYaw, 0, 0, 'YXZ');
-    const turretQ = q.mul(localYawQ.w, localYawQ.x, localYawQ.y, localYawQ.z);
     
-    // Apply pitch exclusively to the barrel/turret gun
-    // Note: To pitch up, we rotate around X axis.
-    // Inverting cameraPitch so that looking down with camera aims barrel down.
+    // Turret Matrix = BodyMatrix * LocalOffset * LocalYaw
+    const turretPivotMatrix = UT.MAT4_MULTIPLY(bodyMatrix, UT.MAT4_TRANSLATE(0, 0.85, 0));
+    const turretMatrix = UT.MAT4_MULTIPLY(turretPivotMatrix, localYawQ.toMatrix4());
+    this.turret.enableManualTransform(turretMatrix);
+
+    // Barrel Logic
     const maxDepress = 0.25; 
     const maxElevate = 0.2;
     const clampedPitch = Math.max(-maxElevate, Math.min(maxDepress, cameraPitch));
-    const pitchQ = Quaternion.createFromEuler(0, -clampedPitch, 0, 'YXZ'); // pitch is X axis rotation
-    const barrelQ = turretQ.mul(pitchQ.w, pitchQ.x, pitchQ.y, pitchQ.z);
-
-    // Increase turret elevation to sit properly on body top (body height 0.9 -> top 0.45)
-    // Turret height 0.75 -> center at 0.45 + 0.375 = 0.825. Using 0.85 for safety.
-    const turretOffset = q.rotateVector([0, 0.85, 0]);
-    this.turret.setPosition(origin[0] + turretOffset[0], origin[1] + turretOffset[1], origin[2] + turretOffset[2]);
-    this.turret.setQuaternion(turretQ);
+    const pitchQ = Quaternion.createFromEuler(0, -clampedPitch, 0, 'YXZ');
 
     const visualRecoil = this.shellRecoil > 0 ? this.shellRecoil * 0.45 : 0;
-    const barrelRelativePos = barrelQ.rotateVector([0, 0.1, -1.2 + visualRecoil]); // Slightly elevate barrel center
-    const turretPos = this.turret.getPosition();
-    this.barrel.setPosition(turretPos[0] + barrelRelativePos[0], turretPos[1] + barrelRelativePos[1], turretPos[2] + barrelRelativePos[2]);
-    this.barrel.setQuaternion(barrelQ);
+    const barrelPivotMatrix = UT.MAT4_MULTIPLY(turretMatrix, UT.MAT4_TRANSLATE(0, 0.1, -1.2 + visualRecoil));
+    this.barrel.enableManualTransform(UT.MAT4_MULTIPLY(barrelPivotMatrix, pitchQ.toMatrix4()));
     
-    const hatchOffset = turretQ.rotateVector([0, 0.375 + 0.075, 0.3]);
-    this.hatch.setPosition(turretPos[0] + hatchOffset[0], turretPos[1] + hatchOffset[1], turretPos[2] + hatchOffset[2]);
-    this.hatch.setQuaternion(turretQ);
-    
-    const antennaOffset = turretQ.rotateVector([-0.6, 0.375 + 0.75, 0.6]);
-    this.antenna.setPosition(turretPos[0] + antennaOffset[0], turretPos[1] + antennaOffset[1], turretPos[2] + antennaOffset[2]);
-    this.antenna.setQuaternion(turretQ);
+    // Hatch & Antenna (Fixed to Turret)
+    const syncToTurret = (mesh: Gfx3Mesh, localPos: vec3) => {
+        const localMatrix = UT.MAT4_TRANSLATE(localPos[0], localPos[1], localPos[2]);
+        mesh.enableManualTransform(UT.MAT4_MULTIPLY(turretMatrix, localMatrix));
+    };
+
+    syncToTurret(this.hatch, [0, 0.375 + 0.075, 0.3]);
+    syncToTurret(this.antenna, [-0.6, 0.375 + 0.75, 0.6]);
     
     return { normal: didShootNormal, grenade: didShootGrenade };
   }

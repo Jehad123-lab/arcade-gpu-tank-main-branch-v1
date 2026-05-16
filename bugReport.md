@@ -12,6 +12,7 @@ Tracking all issues, from critical bugs to minor suggestions.
 -   **[RESOLVED] GRENADE DUD BUG**: Grenades didn't explode if they came to a rest before life expired. Added expiry explosion logic.
 -   **[RESOLVED] MOUSE LOOK/LOCK**: Added pointer lock and refined fire mappings for desktop feel.
 -   **[RESOLVED] UI CLUTTER**: Virtual joysticks and action buttons now hide automatically in desktop mode.
+-   **[RESOLVED] TANK DEFORMATION**: Sub-meshes drifted during rotation. Fixed with rigid matrix hierarchy sync.
 
 ## Warning (Unexpected Behavior)
 
