@@ -147,8 +147,8 @@ export class GameScreen extends Screen {
     this.camera.lookAt(0, 0, 0);
     this.camera.getView().setBgColor(0.53, 0.81, 0.92, 1.0); // Sky blue
     
-    const tankPos = this.tank.body.getPosition();
-    this.cameraLookTarget = [tankPos[0], tankPos[1] + 1.5, tankPos[2]];
+    const tankP = this.tank.physicsBody.body.GetPosition();
+    this.cameraLookTarget = [tankP.GetX(), tankP.GetY() + 1.5, tankP.GetZ()];
     this.isReady = true;
   }
 
@@ -197,14 +197,17 @@ export class GameScreen extends Screen {
     const shots = this.tank.update(ts, combinedMoveDir, isFiringNormal, isFiringGrenade, this.cameraYaw, this.cameraPitch);
     
     if (shots.normal) {
-       this.handleTankShoot(ProjectileType.SHELL);
+       this.spawnProjectile(ProjectileType.SHELL, shots.muzzlePos[0], shots.muzzlePos[1], shots.muzzlePos[2], shots.muzzleDir, 'player');
+       this.handleTankMuzzleFlash(shots.muzzlePos, shots.muzzleDir, ProjectileType.SHELL);
     }
     if (shots.grenade) {
-       this.handleTankShoot(ProjectileType.GRENADE);
+       this.spawnProjectile(ProjectileType.GRENADE, shots.muzzlePos[0], shots.muzzlePos[1], shots.muzzlePos[2], shots.muzzleDir, 'player');
+       this.handleTankMuzzleFlash(shots.muzzlePos, shots.muzzleDir, ProjectileType.GRENADE);
     }
 
     // Update Enemies & Spawn their projectiles
-    const playerPos = this.tank.body.getPosition();
+    const tankP = this.tank.physicsBody.body.GetPosition();
+    const playerPos: vec3 = [tankP.GetX(), tankP.GetY(), tankP.GetZ()];
     for (const enemy of this.enemies) {
        const res = enemy.update(ts, playerPos);
        if (res.didShoot && res.muzzlePos && res.dir) {
@@ -283,28 +286,10 @@ export class GameScreen extends Screen {
     }
   }
 
-  handleTankShoot(type: ProjectileType) {
-    const bPos = this.tank.barrel.getPosition();
-    const bRot = this.tank.barrel.getQuaternion();
-    const forward = bRot.rotateVector([0, 0, -1]);
-    
-    // Account for barrel recoil in spawn position offset
-    // Barrel mesh is ~2.25 deep, center is offset by 1.2. 
-    // Tip is at ~1.125 from center.
-    // We add a bit more (1.5) and subtract current recoil to keep it at fixed tip world pos if possible.
-    const recoilOffset = (this.tank.shellRecoil * 0.45);
-    const tipOffset = 1.6 - recoilOffset;
-
-    let spawnX = bPos[0] + forward[0] * tipOffset;
-    let spawnY = bPos[1] + forward[1] * tipOffset;
-    let spawnZ = bPos[2] + forward[2] * tipOffset;
-
-    this.spawnProjectile(type, spawnX, spawnY, spawnZ, bRot, 'player');
-    
-    // Muzzle Flash
+  handleTankMuzzleFlash(pos: vec3, forward: vec3, type: ProjectileType) {
     const exp = this.explosionPool.acquire() as Explosion;
     if (exp) {
-        exp.reset(spawnX, spawnY, spawnZ, type === ProjectileType.GRENADE ? [1.0, 0.5, 0.2] : [1.0, 0.9, 0.3], forward, type === ProjectileType.GRENADE ? 2.5 : 1.5, 'muzzle');
+        exp.reset(pos[0], pos[1], pos[2], type === ProjectileType.GRENADE ? [1.0, 0.5, 0.2] : [1.0, 0.9, 0.3], forward, type === ProjectileType.GRENADE ? 2.5 : 1.5, 'muzzle');
         this.explosions.push(exp);
     }
   }
@@ -346,11 +331,22 @@ export class GameScreen extends Screen {
     gfx3Manager.endDrawing();
   }
 
-  spawnProjectile(type: ProjectileType, x: number, y: number, z: number, q: Quaternion, ownerId: string, speedMod: number = 1.0) {
-    let finalY = y;
-    let finalQ = q;
+  spawnProjectile(type: ProjectileType, x: number, y: number, z: number, orientation: Quaternion | vec3, ownerId: string, speedMod: number = 1.0) {
+    let finalDirection: vec3;
+    let finalRotation: Gfx3Jolt.Quat;
 
-    const direction = finalQ.rotateVector([0, 0, -1]);
+    if (orientation instanceof Quaternion) {
+        finalDirection = orientation.rotateVector([0, 0, -1]);
+        finalRotation = new Gfx3Jolt.Quat(orientation.x, orientation.y, orientation.z, orientation.w);
+    } else {
+        // orientation is a normalized direction vector
+        finalDirection = orientation;
+        const yaw = Math.atan2(-finalDirection[0], -finalDirection[2]);
+        const pitch = Math.asin(finalDirection[1]);
+        const q = Quaternion.createFromEuler(yaw, pitch, 0, 'YXZ');
+        finalRotation = new Gfx3Jolt.Quat(q.x, q.y, q.z, q.w);
+    }
+
     const pMesh = type === ProjectileType.GRENADE ? this.grenadeMesh : this.shellMesh;
     
     // Physics body
@@ -358,8 +354,8 @@ export class GameScreen extends Screen {
       width: type === ProjectileType.GRENADE ? 0.6 : 0.4,
       height: type === ProjectileType.GRENADE ? 0.6 : 0.4,
       depth: type === ProjectileType.GRENADE ? 0.6 : 1.2,
-      x: x, y: finalY, z: z,
-      rotation: new Gfx3Jolt.Quat(finalQ.x, finalQ.y, finalQ.z, finalQ.w),
+      x: x, y: y, z: z,
+      rotation: finalRotation,
       motionType: Gfx3Jolt.EMotionType_Dynamic,
       layer: JOLT_LAYER_MOVING,
       settings: { 
@@ -378,9 +374,9 @@ export class GameScreen extends Screen {
     forwardSpeed *= speedMod;
 
     const pVel = new Gfx3Jolt.Vec3(
-      direction[0] * forwardSpeed, 
-      (direction[1] * forwardSpeed) + upwardVel, 
-      direction[2] * forwardSpeed
+      finalDirection[0] * forwardSpeed, 
+      (finalDirection[1] * forwardSpeed) + upwardVel, 
+      finalDirection[2] * forwardSpeed
     );
     gfx3JoltManager.bodyInterface.SetLinearVelocity(pBody.body.GetID(), pVel);
 

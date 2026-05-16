@@ -13,6 +13,8 @@ Tracking all issues, from critical bugs to minor suggestions.
 -   **[RESOLVED] MOUSE LOOK/LOCK**: Added pointer lock and refined fire mappings for desktop feel.
 -   **[RESOLVED] UI CLUTTER**: Virtual joysticks and action buttons now hide automatically in desktop mode.
 -   **[RESOLVED] TANK DEFORMATION**: Sub-meshes drifted during rotation. Fixed with rigid matrix hierarchy sync.
+-   **[RESOLVED] GROUND SINKING**: Visual meshes were offset downwards. Fixed by center-aligning meshes with physics bodies.
+-   **[RESOLVED] CAMERA TRACKING**: Camera tracked stale mesh positions. Fixed by tracking physics bodies directly.
 
 ## Warning (Unexpected Behavior)
 

@@ -219,7 +219,7 @@ export class Enemy {
 
     const pos = this.physicsBody.body.GetPosition();
     const q = this.visualQuat;
-    const origin: vec3 = [pos.GetX(), pos.GetY() - 0.25, pos.GetZ()];
+    const origin: vec3 = [pos.GetX(), pos.GetY(), pos.GetZ()];
 
     const matBody = UT.MAT4_TRANSFORM(origin, ZERO, scale, q);
     gfx3MeshRenderer.drawMesh(Enemy.bodyMesh, matBody);

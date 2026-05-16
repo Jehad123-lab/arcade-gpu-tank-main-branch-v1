@@ -94,7 +94,7 @@ export class Tank {
   /**
    * Updates physics and syncs mesh transforms.
    */
-  update(ts: number, moveDir: { x: number, y: number }, fireNormal: boolean, fireGrenade: boolean, cameraYaw: number = 0, cameraPitch: number = 0): { normal: boolean, grenade: boolean } {
+  update(ts: number, moveDir: { x: number, y: number }, fireNormal: boolean, fireGrenade: boolean, cameraYaw: number = 0, cameraPitch: number = 0): { normal: boolean, grenade: boolean, muzzlePos: vec3, muzzleDir: vec3 } {
     const speed = 15;
     const rotSpeed = 3.5;
 
@@ -197,8 +197,8 @@ export class Tank {
     gfx3JoltManager.bodyInterface.SetAngularVelocity(this.physicsBody.body.GetID(), new Gfx3Jolt.Vec3(0, 0, 0));
 
     // Physics Movement Update (using ground-aligned orientation for movement directions)
-    const forward = quat.rotateVector([0, 0, -1]);
-    const linVel = UT.VEC3_SCALE(forward, this.velocity);
+    const forwardVec = quat.rotateVector([0, 0, -1]);
+    const linVel = UT.VEC3_SCALE(forwardVec, this.velocity);
     const curVel = this.physicsBody.body.GetLinearVelocity();
     
     const mass = 500.0;
@@ -217,7 +217,7 @@ export class Tank {
 
     // Sync Visuals
     const q = quat;
-    const origin: vec3 = [pos.GetX(), pos.GetY() - 0.35, pos.GetZ()];
+    const origin: vec3 = [pos.GetX(), pos.GetY(), pos.GetZ()];
 
     // Root Body Matrix
     const bodyMatrix = UT.MAT4_TRANSFORM(origin, [0, 0, 0], [1, 1, 1], q);
@@ -264,7 +264,8 @@ export class Tank {
 
     const visualRecoil = this.shellRecoil > 0 ? this.shellRecoil * 0.45 : 0;
     const barrelPivotMatrix = UT.MAT4_MULTIPLY(turretMatrix, UT.MAT4_TRANSLATE(0, 0.1, -1.2 + visualRecoil));
-    this.barrel.enableManualTransform(UT.MAT4_MULTIPLY(barrelPivotMatrix, pitchQ.toMatrix4()));
+    const barrelMatrix = UT.MAT4_MULTIPLY(barrelPivotMatrix, pitchQ.toMatrix4());
+    this.barrel.enableManualTransform(barrelMatrix);
     
     // Hatch & Antenna (Fixed to Turret)
     const syncToTurret = (mesh: Gfx3Mesh, localPos: vec3) => {
@@ -274,8 +275,23 @@ export class Tank {
 
     syncToTurret(this.hatch, [0, 0.375 + 0.075, 0.3]);
     syncToTurret(this.antenna, [-0.6, 0.375 + 0.75, 0.6]);
+
+    // Calculate Muzzle Pos & Dir from barrelMatrix
+    // Muzzle is at local [0, 0, -1.125] relative to barrel center
+    const muzzleLocalPos = [0, 0, -1.125, 1];
+    const muzzleWorldPosVec4 = UT.MAT4_MULTIPLY_BY_VEC4(barrelMatrix, muzzleLocalPos);
+    const muzzleWorldPos: vec3 = [muzzleWorldPosVec4[0], muzzleWorldPosVec4[1], muzzleWorldPosVec4[2]];
     
-    return { normal: didShootNormal, grenade: didShootGrenade };
+    // Direction is forward of barrelMatrix
+    const muzzleWorldDirVec4 = UT.MAT4_MULTIPLY_BY_VEC4(barrelMatrix, [0, 0, -1, 0]);
+    const muzzleWorldDir = UT.VEC3_NORMALIZE([muzzleWorldDirVec4[0], muzzleWorldDirVec4[1], muzzleWorldDirVec4[2]]);
+    
+    return { 
+      normal: didShootNormal, 
+      grenade: didShootGrenade,
+      muzzlePos: muzzleWorldPos,
+      muzzleDir: muzzleWorldDir
+    };
   }
   
   /**
