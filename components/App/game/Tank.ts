@@ -117,15 +117,25 @@ export class Tank {
     this.grenadeRecoil -= (ts / 1000) * 2; // Grenades have slower fire rate
     if (this.grenadeRecoil < 0) this.grenadeRecoil = 0;
     
-    // Steering Logic with momentum
-    const targetRotSpeed = -moveDir.x * rotSpeed;
-    const rotAlpha = 1.0 - Math.exp(-5.0 * (ts / 1000));
-    this.rotation += targetRotSpeed * rotAlpha * (ts / 1000) * 10; 
+    // Steering Logic with momentum and speed-sensitivity
+    const speedFactor = Math.abs(this.velocity) / speed;
+    // Turn faster when slow (pivot), wider turns when fast
+    const baseRotSpeed = rotSpeed * (1.0 - speedFactor * 0.4); 
+    const targetRotSpeed = -moveDir.x * baseRotSpeed;
+    const rotAlpha = 1.0 - Math.exp(-8.0 * (ts / 1000));
+    
+    // Add a small rotation boost when stationary for pivot turns
+    const pivotBoost = Math.abs(this.velocity) < 1.0 ? 1.5 : 1.0;
+    this.rotation += targetRotSpeed * pivotBoost * rotAlpha * (ts / 1000) * 10; 
     
     const throttle = moveDir.y;
+    const isBraking = (throttle > 0 && this.velocity < 0) || (throttle < 0 && this.velocity > 0);
     const targetVelocity = throttle * speed;
-    const accelRate = 1.0 - Math.exp((throttle !== 0 ? -3.0 : -6.0) * (ts / 1000));
-    this.velocity = UT.LERP(this.velocity, targetVelocity, accelRate);
+    
+    // Snappier acceleration, very fast braking
+    const baseAccel = throttle !== 0 ? (isBraking ? -12.0 : -4.0) : -6.0;
+    const accelAlpha = 1.0 - Math.exp(baseAccel * (ts / 1000));
+    this.velocity = UT.LERP(this.velocity, targetVelocity, accelAlpha);
 
     // Physics Update
     const pos = this.physicsBody.body.GetPosition();

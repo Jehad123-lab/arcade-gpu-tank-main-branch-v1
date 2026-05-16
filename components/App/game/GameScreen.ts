@@ -169,14 +169,16 @@ export class GameScreen extends Screen {
     if (inputManager.isActiveAction('CAM_L')) this.cameraYaw -= 2.5 * (ts / 1000);
     if (inputManager.isActiveAction('CAM_R')) this.cameraYaw += 2.5 * (ts / 1000);
     
-    // Auto-Align Camera behind tank when moving
-    if (Math.abs(this.tank.velocity) > 1.0) {
+    // Flexible Auto-Align Camera behind tank when moving
+    if (Math.abs(this.tank.velocity) > 2.0) {
         const targetYaw = this.tank.rotation;
         let diff = ((targetYaw - this.cameraYaw) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
         if (diff > Math.PI) diff -= Math.PI * 2;
         
-        // Faster auto-align for better tracking
-        const autoAlignSpeed = 2.0 * (ts / 1000);
+        // Use a dynamic alignment speed that increases with the angle difference
+        // This gives a nice "swinging" feel rather than a robotic snap
+        const alignmentIntensity = UT.LERP(0.5, 3.0, Math.min(1.0, Math.abs(diff) / (Math.PI / 4)));
+        const autoAlignSpeed = alignmentIntensity * (ts / 1000);
         this.cameraYaw += Math.sign(diff) * Math.min(Math.abs(diff), autoAlignSpeed);
     }
 
@@ -256,7 +258,7 @@ export class GameScreen extends Screen {
         Math.cos(cy) * Math.cos(cp) * this.cameraDistance
     ];
     
-    const targetHeightOffset = 1.8;
+    const targetHeightOffset = 2.2;
     const followPos = playerPos;
     
     if (!followPos || isNaN(followPos[0]) || isNaN(followPos[1]) || isNaN(followPos[2])) {
@@ -270,11 +272,11 @@ export class GameScreen extends Screen {
     ] as vec3;
     
     const camPos = this.camera.getPosition();
-    const posAlpha = 1.0 - Math.exp(-8.0 * (ts / 1000));
+    const posAlpha = 1.0 - Math.exp(-6.0 * (ts / 1000));
     const finalCamPos = UT.VEC3_LERP(camPos, camTargetPos, posAlpha);
     
     const lookTargetGoal = [followPos[0], followPos[1] + targetHeightOffset, followPos[2]] as vec3;
-    const lookAlpha = 1.0 - Math.exp(-12.0 * (ts / 1000));
+    const lookAlpha = 1.0 - Math.exp(-10.0 * (ts / 1000));
     this.cameraLookTarget = UT.VEC3_LERP(this.cameraLookTarget, lookTargetGoal, lookAlpha);
     
     if (!isNaN(finalCamPos[0])) {

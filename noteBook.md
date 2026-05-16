@@ -14,6 +14,7 @@ A log of all tasks, ideas, and progress for this project.
 
 ## Done
 
+-   **[2026-05-16 09:22]**: Implemented "Modern Arcade" control suite: Added speed-sensitive steering (tighter pivot turns, wider high-speed turns), responsive braking momentum, and a "Dynamic Swing" auto-follow camera that mimics vehicle physics. Increased camera height for better tactical awareness.
 -   **[2026-05-16 09:15]**: Removed visible laser sight as requested. Implemented "Smart Follow" camera that automatically aligns behind the tank during movement while allowing manual orbit overrides.
 -   **[2026-05-16 09:10]**: Improved aiming mechanics: Increased turret traverse speed from 1.5 to 4.5 rad/s for faster target acquisition. Added a visible red laser sight originating from the barrel tip to assist in precise aiming. (DEPRECATED Laser)
 -   **[2026-05-16 09:05]**: Fixed camera jitter by refactoring `GameScreen.ts` to use higher-order interpolation and stabilized target tracking. Improved tank controls in `Tank.ts` with momentum-based rotation and refined physics force application for a more responsive arcade feel.
