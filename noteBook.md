@@ -14,6 +14,8 @@ A log of all tasks, ideas, and progress for this project.
 
 ## Done
 
+-   **[2026-05-16 07:35]**: Fixed `TypeError: Cannot read properties of undefined (reading 'setPosition')` in `Tank.ts` caused by calling `setPosition` on an undefined `group` property. Synced all tank meshes to a calculated `origin` instead.
+-   **[2026-05-16 07:30]**: Implemented "Modern Arcade" stability system. Separated vertical physics orientation (Pitch/Roll locked to 0) from visual banking. Lifted physics bodies (0.35m cushion) to prevent terrain snags. Increased mass (500) and angular damping (50) for premium weighty feel.
 -   **[2026-05-16 07:20]**: Fixed `gfx3JoltManager.bodyInterface.SetAllowedDOFs is not a function` error by using `body.GetMotionProperties().SetAllowedDOFs(63)` instead.  
 -   **[2026-05-16 07:15]**: Fixed major tank/enemy flipping issues by increasing angular damping (10x), resetting angular velocity after forced rotation, and projecting movement forces onto the ground normal. Enabled all rotation DOFs to support smooth ground alignment.
 -   **[2026-05-16 07:10]**: Fixed Jolt physics API errors (`optimizeBroadPhase`, `removeBody`). Corrected player property access in `App.tsx`. Resolved numerous TypeScript linting errors in `Tank.ts`, `Enemy.ts`, and `ErrorBoundary.tsx`. Updated design system with `Bebas Neue`, `Victor Mono`, and Phosphor icons. 

@@ -61,10 +61,10 @@ export class Tank {
 
     this.physicsBody = gfx3JoltManager.addBox({
       width: 3.45, height: 0.9, depth: 3.6,
-      x: 0, y: 0.5, z: 0,
+      x: 0, y: 0.8, z: 0,
       motionType: Gfx3Jolt.EMotionType_Dynamic,
       layer: JOLT_LAYER_MOVING,
-      settings: { mAngularDamping: 10.0, mMassPropertiesOverride: 100.0 }
+      settings: { mAngularDamping: 50.0, mMassPropertiesOverride: 500.0 }
     });
   }
 
@@ -191,24 +191,23 @@ export class Tank {
         quat = alignQ.mul(quat.w, quat.x, quat.y, quat.z); // Multiply align * yaw
     }
 
-    const joltQuat = new Gfx3Jolt.Quat(quat.x, quat.y, quat.z, quat.w);
-    // Sync physics body rotation with visual rotation (including ground alignment)
-    gfx3JoltManager.bodyInterface.SetRotation(this.physicsBody.body.GetID(), joltQuat, Gfx3Jolt.EActivation_Activate);
-    // Reset angular velocity to prevent physics engine from fighting our forced rotation
+    const physicsQuat = Quaternion.createFromEuler(this.rotation, 0, 0, 'YXZ');
+    const joltPhysicsQuat = new Gfx3Jolt.Quat(physicsQuat.x, physicsQuat.y, physicsQuat.z, physicsQuat.w);
+    gfx3JoltManager.bodyInterface.SetRotation(this.physicsBody.body.GetID(), joltPhysicsQuat, Gfx3Jolt.EActivation_Activate);
     gfx3JoltManager.bodyInterface.SetAngularVelocity(this.physicsBody.body.GetID(), new Gfx3Jolt.Vec3(0, 0, 0));
 
-    // Physics Movement Update (using ground-aligned orientation)
+    // Physics Movement Update (using ground-aligned orientation for movement directions)
     const forward = quat.rotateVector([0, 0, -1]);
     const linVel = UT.VEC3_SCALE(forward, this.velocity);
     const curVel = this.physicsBody.body.GetLinearVelocity();
     
-    const mass = 100.0;
+    const mass = 500.0;
     const velDiffX = linVel[0] - curVel.GetX();
     const velDiffY = linVel[1] - curVel.GetY();
     const velDiffZ = linVel[2] - curVel.GetZ();
     
-    const kp = 10.0; 
-    const maxForce = 5000.0;
+    const kp = 20.0; 
+    const maxForce = 25000.0;
     const forceX = Math.max(-maxForce, Math.min(maxForce, velDiffX * mass * kp));
     const forceY = Math.max(-maxForce, Math.min(maxForce, velDiffY * mass * kp));
     const forceZ = Math.max(-maxForce, Math.min(maxForce, velDiffZ * mass * kp));
@@ -216,23 +215,24 @@ export class Tank {
     const joltForce = new Gfx3Jolt.Vec3(forceX, forceY, forceZ);
     gfx3JoltManager.bodyInterface.AddForce(this.physicsBody.body.GetID(), joltForce, Gfx3Jolt.EActivation_Activate);
 
-    // Sync Mesh Positions
+    // Sync Visuals
     const q = quat;
+    const origin: vec3 = [pos.GetX(), pos.GetY() - 0.35, pos.GetZ()];
 
-    this.body.setPosition(pos.GetX(), pos.GetY(), pos.GetZ());
+    this.body.setPosition(origin[0], origin[1], origin[2]);
     this.body.setQuaternion(q);
 
     // Component Offsets
     const trackOffsetL = q.rotateVector([-1.425, -0.15, 0]);
-    this.trackL.setPosition(pos.GetX() + trackOffsetL[0], pos.GetY() + trackOffsetL[1], pos.GetZ() + trackOffsetL[2]);
+    this.trackL.setPosition(origin[0] + trackOffsetL[0], origin[1] + trackOffsetL[1], origin[2] + trackOffsetL[2]);
     this.trackL.setQuaternion(q);
 
     const trackOffsetR = q.rotateVector([1.425, -0.15, 0]);
-    this.trackR.setPosition(pos.GetX() + trackOffsetR[0], pos.GetY() + trackOffsetR[1], pos.GetZ() + trackOffsetR[2]);
+    this.trackR.setPosition(origin[0] + trackOffsetR[0], origin[1] + trackOffsetR[1], origin[2] + trackOffsetR[2]);
     this.trackR.setQuaternion(q);
 
     const engineOffset = q.rotateVector([0, 0.3, 1.8]);
-    this.engine.setPosition(pos.GetX() + engineOffset[0], pos.GetY() + engineOffset[1], pos.GetZ() + engineOffset[2]);
+    this.engine.setPosition(origin[0] + engineOffset[0], origin[1] + engineOffset[1], origin[2] + engineOffset[2]);
     this.engine.setQuaternion(q);
 
     // Turret follows body tilt but has independent yaw
@@ -266,7 +266,7 @@ export class Tank {
     // Increase turret elevation to sit properly on body top (body height 0.9 -> top 0.45)
     // Turret height 0.75 -> center at 0.45 + 0.375 = 0.825. Using 0.85 for safety.
     const turretOffset = q.rotateVector([0, 0.85, 0]);
-    this.turret.setPosition(pos.GetX() + turretOffset[0], pos.GetY() + turretOffset[1], pos.GetZ() + turretOffset[2]);
+    this.turret.setPosition(origin[0] + turretOffset[0], origin[1] + turretOffset[1], origin[2] + turretOffset[2]);
     this.turret.setQuaternion(turretQ);
 
     const visualRecoil = this.shellRecoil > 0 ? this.shellRecoil * 0.45 : 0;

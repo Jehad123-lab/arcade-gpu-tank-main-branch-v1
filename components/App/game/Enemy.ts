@@ -72,6 +72,7 @@ export class Enemy {
   shootCooldown: number = 0;
   hp: number = 100;
   currentUp: vec3 = [0, 1, 0];
+  visualQuat: Quaternion = new Quaternion();
   
   constructor(x: number, y: number, z: number) {
     // Note: initMeshes should be called externally to wait for async loading
@@ -81,10 +82,10 @@ export class Enemy {
 
     this.physicsBody = gfx3JoltManager.addBox({
       width: 1.5, height: 0.6, depth: 2.2,
-      x, y, z,
+      x, y: y + 0.4, z,
       motionType: Gfx3Jolt.EMotionType_Dynamic,
       layer: JOLT_LAYER_MOVING,
-      settings: { mAngularDamping: 10.0, mMassPropertiesOverride: 100.0 }
+      settings: { mAngularDamping: 50.0, mMassPropertiesOverride: 500.0 }
     });
   }
 
@@ -136,12 +137,15 @@ export class Enemy {
         quat = alignQ.mul(quat.w, quat.x, quat.y, quat.z);
     }
 
-    const joltQuat = new Gfx3Jolt.Quat(quat.x, quat.y, quat.z, quat.w);
-    gfx3JoltManager.bodyInterface.SetRotation(this.physicsBody.body.GetID(), joltQuat, Gfx3Jolt.EActivation_Activate);
+    this.visualQuat = quat;
+
+    const physicsQuat = Quaternion.createFromEuler(this.rotation, 0, 0, 'YXZ');
+    const joltPhysicsQuat = new Gfx3Jolt.Quat(physicsQuat.x, physicsQuat.y, physicsQuat.z, physicsQuat.w);
+    gfx3JoltManager.bodyInterface.SetRotation(this.physicsBody.body.GetID(), joltPhysicsQuat, Gfx3Jolt.EActivation_Activate);
     gfx3JoltManager.bodyInterface.SetAngularVelocity(this.physicsBody.body.GetID(), new Gfx3Jolt.Vec3(0, 0, 0));
 
     // Physics Movement Update
-    const speed = 6;
+    const speed = 10;
     let throttle = 0;
     if (dist > 15) {
         throttle = 1; 
@@ -153,12 +157,12 @@ export class Enemy {
     const linVel = UT.VEC3_SCALE(forward, throttle * speed);
     const curVel = this.physicsBody.body.GetLinearVelocity();
     
-    const mass = 100.0;
+    const mass = 500.0;
     const velDiffX = linVel[0] - curVel.GetX();
     const velDiffY = linVel[1] - curVel.GetY();
     const velDiffZ = linVel[2] - curVel.GetZ();
-    const kp = 10.0;
-    const maxForce = 2500.0;
+    const kp = 20.0;
+    const maxForce = 15000.0;
     const forceX = Math.max(-maxForce, Math.min(maxForce, velDiffX * mass * kp));
     const forceY = Math.max(-maxForce, Math.min(maxForce, velDiffY * mass * kp));
     const forceZ = Math.max(-maxForce, Math.min(maxForce, velDiffZ * mass * kp));
@@ -214,9 +218,8 @@ export class Enemy {
     const ZERO: vec3 = [0,0,0];
 
     const pos = this.physicsBody.body.GetPosition();
-    const currentRot = this.physicsBody.body.GetRotation();
-    const q = new Quaternion(currentRot.GetW(), currentRot.GetX(), currentRot.GetY(), currentRot.GetZ());
-    const origin: vec3 = [pos.GetX(), pos.GetY(), pos.GetZ()];
+    const q = this.visualQuat;
+    const origin: vec3 = [pos.GetX(), pos.GetY() - 0.25, pos.GetZ()];
 
     const matBody = UT.MAT4_TRANSFORM(origin, ZERO, scale, q);
     gfx3MeshRenderer.drawMesh(Enemy.bodyMesh, matBody);
