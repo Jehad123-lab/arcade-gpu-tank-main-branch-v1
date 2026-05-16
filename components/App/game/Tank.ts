@@ -131,22 +131,19 @@ export class Tank {
     const targetTurnVelocity = moveDir.x * baseRotSpeed; 
     
     // Y-axis angular velocity: negative is clockwise (Right), positive is counter-clockwise (Left)
+    // We want D (+1) to turn Right (negative angVel)
     const angVel = this.physicsBody.body.GetAngularVelocity();
-    const turnAlpha = 1.0 - Math.exp(-20.0 * (ts / 1000)); 
+    const turnAlpha = 1.0 - Math.exp(-25.0 * (ts / 1000)); 
     const newAngVelY = UT.LERP(angVel.GetY(), -targetTurnVelocity, turnAlpha);
     
-    gfx3JoltManager.bodyInterface.SetAngularVelocity(
-      this.physicsBody.body.GetID(), 
-      new Gfx3Jolt.Vec3(0, newAngVelY, 0)
-    );
-    
-    // Throttle Logic: W should move forward.
+    // FORWARD MOVEMENT LOGIC
+    // W (+1) should move Forward.
     const throttle = moveDir.y; 
     const isBraking = (throttle > 0 && this.velocity < 0) || (throttle < 0 && this.velocity > 0);
     const targetVelocity = throttle * speed;
     
     // Snappier acceleration, very fast braking
-    const baseAccel = throttle !== 0 ? (isBraking ? -30.0 : -12.0) : -15.0; // Snappier response
+    const baseAccel = throttle !== 0 ? (isBraking ? -30.0 : -12.0) : -15.0;
     const accelAlpha = 1.0 - Math.exp(baseAccel * (ts / 1000));
     this.velocity = UT.LERP(this.velocity, targetVelocity, accelAlpha);
 
@@ -154,22 +151,34 @@ export class Tank {
     const pos = this.physicsBody.body.GetPosition();
     const qPhysics = this.physicsBody.body.GetRotation();
     const currentQuat = new Quaternion(qPhysics.GetW(), qPhysics.GetX(), qPhysics.GetY(), qPhysics.GetZ());
+    
+    // Extract Yaw from Forward Vector
     const forwardVec = currentQuat.rotateVector([0, 0, -1]);
     this.rotation = Math.atan2(-forwardVec[0], -forwardVec[2]);
 
-    // STABILITY FIX: Instead of SetRotation every frame (causes shaking),
-    // we calculate a visual banking quat and use a gentle corrective torque 
-    // or simply zero out the pitch/roll angular components to keep it flat.
+    // STABILITY FIX: Force upright rotation to prevent flipping, while preserving yaw.
     const uprightQuat = Quaternion.createFromEuler(this.rotation, 0, 0, 'YXZ');
+    const joltRotation = new Gfx3Jolt.Quat(uprightQuat.x, uprightQuat.y, uprightQuat.z, uprightQuat.w);
+    gfx3JoltManager.bodyInterface.SetRotation(this.physicsBody.body.GetID(), joltRotation, Gfx3Jolt.EActivation_Activate);
     
-    // Dampen X/Z tilt via angular velocity zeroing (smoother than SetRotation)
-    const curAngVel = this.physicsBody.body.GetAngularVelocity();
-    gfx3JoltManager.bodyInterface.SetAngularVelocity(
+    // MOVEMENT STABILITY: Use SetLinearVelocity for arcade feel (no jitter from force PID)
+    const forwardVecActual = uprightQuat.rotateVector([0, 0, -1]);
+    const currentJoltVel = this.physicsBody.body.GetLinearVelocity();
+    const targetLinearVel = UT.VEC3_SCALE(forwardVecActual, this.velocity);
+    
+    // We preserve gravity (Y velocity) to allow falling off ridges
+    gfx3JoltManager.bodyInterface.SetLinearVelocity(
         this.physicsBody.body.GetID(), 
-        new Gfx3Jolt.Vec3(curAngVel.GetX() * 0.7, curAngVel.GetY(), curAngVel.GetZ() * 0.7)
+        new Gfx3Jolt.Vec3(targetLinearVel[0], currentJoltVel.GetY(), targetLinearVel[2])
     );
 
-    // Calculate ground-aligned orientation for visual mesh only (banking)
+    // Also strictly zero out X/Z angular velocity
+    gfx3JoltManager.bodyInterface.SetAngularVelocity(
+        this.physicsBody.body.GetID(), 
+        new Gfx3Jolt.Vec3(0, newAngVelY, 0)
+    );
+
+    // Visual Banking (Mesh only)
     let visualQuat = uprightQuat;
     
     // Cast rays from 4 corners down to find the ground normal for smooth banking
@@ -232,27 +241,6 @@ export class Tank {
         const alignQ = Quaternion.createFromAxisAngle(axis, angle);
         visualQuat = alignQ.mul(visualQuat.w, visualQuat.x, visualQuat.y, visualQuat.z);
     }
-
-    // Physics Movement Update
-    const forwardVecActual = uprightQuat.rotateVector([0, 0, -1]);
-    const linVel = UT.VEC3_SCALE(forwardVecActual, this.velocity);
-    const curVel = this.physicsBody.body.GetLinearVelocity();
-    
-    // Adjust forces to be more "Heavy" but "Direct"
-    const mass = 1000.0; // Heavier tank
-    const velDiffX = linVel[0] - curVel.GetX();
-    const velDiffY = linVel[1] - curVel.GetY();
-    const velDiffZ = linVel[2] - curVel.GetZ();
-    
-    // Lowered KP to stop physics jitter (shaking)
-    const kp = 25.0; 
-    const maxForce = 50000.0; 
-    const forceX = Math.max(-maxForce, Math.min(maxForce, velDiffX * mass * kp));
-    const forceY = Math.max(-maxForce, Math.min(maxForce, velDiffY * mass * kp));
-    const forceZ = Math.max(-maxForce, Math.min(maxForce, velDiffZ * mass * kp));
-    
-    const joltForce = new Gfx3Jolt.Vec3(forceX, forceY, forceZ);
-    gfx3JoltManager.bodyInterface.AddForce(this.physicsBody.body.GetID(), joltForce, Gfx3Jolt.EActivation_Activate);
 
     // Sync Visuals
     const q = visualQuat;

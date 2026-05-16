@@ -300,7 +300,7 @@ export class GameScreen extends Screen {
         this.camera.setPosition(finalCamPos[0] + shakeX, finalCamPos[1] + shakeY, finalCamPos[2] + shakeZ);
         this.camera.lookAt(
             this.cameraLookTarget[0], 
-            this.cameraLookTarget[1] + targetHeightOffset, 
+            this.cameraLookTarget[1], 
             this.cameraLookTarget[2]
         );
     }

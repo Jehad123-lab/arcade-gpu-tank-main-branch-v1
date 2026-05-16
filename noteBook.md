@@ -14,6 +14,7 @@ A log of all tasks, ideas, and progress for this project.
 
 ## Done
 
+-   **[2026-05-16 10:14]**: Major Stability & Control Overhaul: Switched to velocity-based movement (SetLinearVelocity) for both Player and AI to eliminate physics jitter/shaking. Implemented an aggressive anti-flip system that forces physics hulls to remain perfectly upright. Standardized forward vectors and throttle signs to fix W/S and A/D inversions. Toned down screen shake and refined camera look-at tracking.
 -   **[2026-05-16 10:04]**: Fixed `ReferenceError: baseRotSpeed is not defined`. Standardized Forward vector to `[0, 0, -1]` to fix W/S inversion (W=Forward, S=Backward). Corrected A/D steering (D=Right/Clockwise). Reduced physics jitter by optimizing PID force calculation and using angular velocity damping instead of frame-by-frame rotation overrides.
 -   **[2026-05-16 09:59]**: Fixed control inversions (W/S and A/D) by standardizing the forward vector to `[0, 0, 1]`. Resolved physics "shaking" by replacing hard frame-by-frame rotation overrides with high angular damping on X/Z and a lower PID gain ($K_p=25$). Refined camera tracking for smoother look-at behavior and reduced screen shake magnitude.
 -   **[2026-05-16 09:52]**: Fixed "Flipping Tank" syndrome by enforcing upright physics orientation every frame (locking X/Z rotation). Retuned camera for a "Tactical Arcade" view: increased height, distance, and pitch for better battlefield situational awareness. Smoothed out camera tracking and look-target interpolation to reduce jitter.

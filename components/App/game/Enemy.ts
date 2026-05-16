@@ -158,21 +158,15 @@ export class Enemy {
         throttle = -0.5; 
     }
 
-    const forward = currentQuat.rotateVector([0, 0, -1]);
-    const linVel = UT.VEC3_SCALE(forward, throttle * speed);
-    const curVel = this.physicsBody.body.GetLinearVelocity();
+    // MOVEMENT STABILITY: Use SetLinearVelocity for arcade feel
+    const forwardVecActual = currentQuat.rotateVector([0, 0, -1]);
+    const currentJoltVel = this.physicsBody.body.GetLinearVelocity();
+    const targetLinearVel = UT.VEC3_SCALE(forwardVecActual, throttle * speed);
     
-    const mass = 500.0;
-    const velDiffX = linVel[0] - curVel.GetX();
-    const velDiffY = linVel[1] - curVel.GetY();
-    const velDiffZ = linVel[2] - curVel.GetZ();
-    const kp = 20.0;
-    const maxForce = 15000.0;
-    const forceX = Math.max(-maxForce, Math.min(maxForce, velDiffX * mass * kp));
-    const forceY = Math.max(-maxForce, Math.min(maxForce, velDiffY * mass * kp));
-    const forceZ = Math.max(-maxForce, Math.min(maxForce, velDiffZ * mass * kp));
-    const joltForce = new Gfx3Jolt.Vec3(forceX, forceY, forceZ);
-    gfx3JoltManager.bodyInterface.AddForce(this.physicsBody.body.GetID(), joltForce, Gfx3Jolt.EActivation_Activate);
+    gfx3JoltManager.bodyInterface.SetLinearVelocity(
+        this.physicsBody.body.GetID(), 
+        new Gfx3Jolt.Vec3(targetLinearVel[0], currentJoltVel.GetY(), targetLinearVel[2])
+    );
     
     let didShoot = false;
     let muzzlePos: vec3 | undefined = undefined;
