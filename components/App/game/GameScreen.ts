@@ -52,6 +52,7 @@ export class GameScreen extends Screen {
   projectiles: Projectile[] = [];
   shellMesh: Gfx3Mesh;
   grenadeMesh: Gfx3Mesh;
+  laserMesh: Gfx3Mesh;
   moveDir = { x: 0, y: 0 };
   virtualFireNormal: boolean = false;
   virtualFireGrenade: boolean = false;
@@ -81,6 +82,7 @@ export class GameScreen extends Screen {
     // Create base meshes for projectiles
     this.shellMesh = createBoxMesh(0.4, 0.4, 1.2, [1.0, 0.8, 0.2]); // Visible golden shell
     this.grenadeMesh = createBoxMesh(0.6, 0.6, 0.6, [0.4, 0.4, 0.4]); // Grenade body
+    this.laserMesh = createBoxMesh(0.04, 0.04, 100, [1.0, 0.0, 0.0]); // Laser sight
 
     // Spawn exactly 3 enemies as requested
     while (this.enemies.length < 3) {
@@ -300,6 +302,15 @@ export class GameScreen extends Screen {
     const camPos = this.camera.getPosition();
     this.level.draw(camPos);
     this.tank.draw(this.cameraYaw);
+    
+    // Draw Laser Sight
+    if (this.tank.hp > 0) {
+        const barrelMat = this.tank.barrel.getTransformMatrix();
+        const laserOffset = UT.MAT4_TRANSLATE(0, 0, -51.125); // Start at tip, extend forward
+        const laserMat = UT.MAT4_MULTIPLY(barrelMat, laserOffset);
+        gfx3MeshRenderer.drawMesh(this.laserMesh, laserMat);
+    }
+
     for (const enemy of this.enemies) {
        enemy.draw(this.cameraYaw);
     }

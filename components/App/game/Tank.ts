@@ -246,7 +246,8 @@ export class Tank {
     let yawDiff = ((cameraYaw - this.turretYaw) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
     if (yawDiff > Math.PI) yawDiff -= Math.PI * 2;
     
-    const turretTraverseSpeed = 1.5;
+    // Increased traverse speed for snappier arcade feel
+    const turretTraverseSpeed = 4.5;
     const traverseAmount = turretTraverseSpeed * (ts / 1000);
     
     if (Math.abs(yawDiff) < traverseAmount) {
