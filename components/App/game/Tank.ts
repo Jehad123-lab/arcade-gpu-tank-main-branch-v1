@@ -64,7 +64,7 @@ export class Tank {
       x: 0, y: 0.5, z: 0,
       motionType: Gfx3Jolt.EMotionType_Dynamic,
       layer: JOLT_LAYER_MOVING,
-      settings: { mAngularDamping: 1.0, mMassPropertiesOverride: 100.0, mAllowedDOFs: 23 } // Added RotationY (16) to DOFs (7|16=23)
+      settings: { mAngularDamping: 10.0, mMassPropertiesOverride: 100.0 }
     });
   }
 
@@ -126,26 +126,6 @@ export class Tank {
     this.velocity = UT.LERP(this.velocity, targetVelocity, accelRate);
 
     // Physics Update
-    const forward = [-Math.sin(this.rotation), 0, -Math.cos(this.rotation)] as vec3;
-    const linVel = UT.VEC3_SCALE(forward, this.velocity);
-    
-    const curVel = this.physicsBody.body.GetLinearVelocity();
-    
-    // Instead of hard-setting velocity which fights the collision solver, 
-    // we use a PD controller approach (adding forces) to approach the target velocity.
-    const mass = 100.0; // from mMassPropertiesOverride
-    const velDiffX = linVel[0] - curVel.GetX();
-    const velDiffZ = linVel[2] - curVel.GetZ();
-    
-    // Proportional gain for the velocity controller - reduced to prevent pushing through walls
-    const kp = 8.0; 
-    const maxForce = 3000.0;
-    const forceX = Math.max(-maxForce, Math.min(maxForce, velDiffX * mass * kp));
-    const forceZ = Math.max(-maxForce, Math.min(maxForce, velDiffZ * mass * kp));
-    
-    const joltForce = new Gfx3Jolt.Vec3(forceX, 0, forceZ);
-    gfx3JoltManager.bodyInterface.AddForce(this.physicsBody.body.GetID(), joltForce, Gfx3Jolt.EActivation_Activate);
-    
     const pos = this.physicsBody.body.GetPosition();
     let quat = Quaternion.createFromEuler(this.rotation, 0, 0, 'YXZ');
     
@@ -214,6 +194,27 @@ export class Tank {
     const joltQuat = new Gfx3Jolt.Quat(quat.x, quat.y, quat.z, quat.w);
     // Sync physics body rotation with visual rotation (including ground alignment)
     gfx3JoltManager.bodyInterface.SetRotation(this.physicsBody.body.GetID(), joltQuat, Gfx3Jolt.EActivation_Activate);
+    // Reset angular velocity to prevent physics engine from fighting our forced rotation
+    gfx3JoltManager.bodyInterface.SetAngularVelocity(this.physicsBody.body.GetID(), new Gfx3Jolt.Vec3(0, 0, 0));
+
+    // Physics Movement Update (using ground-aligned orientation)
+    const forward = quat.rotateVector([0, 0, -1]);
+    const linVel = UT.VEC3_SCALE(forward, this.velocity);
+    const curVel = this.physicsBody.body.GetLinearVelocity();
+    
+    const mass = 100.0;
+    const velDiffX = linVel[0] - curVel.GetX();
+    const velDiffY = linVel[1] - curVel.GetY();
+    const velDiffZ = linVel[2] - curVel.GetZ();
+    
+    const kp = 10.0; 
+    const maxForce = 5000.0;
+    const forceX = Math.max(-maxForce, Math.min(maxForce, velDiffX * mass * kp));
+    const forceY = Math.max(-maxForce, Math.min(maxForce, velDiffY * mass * kp));
+    const forceZ = Math.max(-maxForce, Math.min(maxForce, velDiffZ * mass * kp));
+    
+    const joltForce = new Gfx3Jolt.Vec3(forceX, forceY, forceZ);
+    gfx3JoltManager.bodyInterface.AddForce(this.physicsBody.body.GetID(), joltForce, Gfx3Jolt.EActivation_Activate);
 
     // Sync Mesh Positions
     const q = quat;

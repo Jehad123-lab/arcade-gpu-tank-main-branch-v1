@@ -14,6 +14,8 @@ A log of all tasks, ideas, and progress for this project.
 
 ## Done
 
+-   **[2026-05-16 07:20]**: Fixed `gfx3JoltManager.bodyInterface.SetAllowedDOFs is not a function` error by using `body.GetMotionProperties().SetAllowedDOFs(63)` instead.  
+-   **[2026-05-16 07:15]**: Fixed major tank/enemy flipping issues by increasing angular damping (10x), resetting angular velocity after forced rotation, and projecting movement forces onto the ground normal. Enabled all rotation DOFs to support smooth ground alignment.
 -   **[2026-05-16 07:10]**: Fixed Jolt physics API errors (`optimizeBroadPhase`, `removeBody`). Corrected player property access in `App.tsx`. Resolved numerous TypeScript linting errors in `Tank.ts`, `Enemy.ts`, and `ErrorBoundary.tsx`. Updated design system with `Bebas Neue`, `Victor Mono`, and Phosphor icons. 
 -   **[2026-05-12 17:35]**: **v0.3.4 Desktop Optimization**. Disabled virtual mobile controls in desktop mode to clean up the UI for keyboard/mouse players.
 -   **[2026-05-12 17:30]**: **v0.3.3 Visual & Control Polish**. Fixed turret/body mesh intersection. Added grenade expiry explosions. Implemented Pointer Lock and enhanced desktop controls (Shift/E for Grenades).

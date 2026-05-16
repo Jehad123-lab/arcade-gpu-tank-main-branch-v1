@@ -84,7 +84,7 @@ export class Enemy {
       x, y, z,
       motionType: Gfx3Jolt.EMotionType_Dynamic,
       layer: JOLT_LAYER_MOVING,
-      settings: { mAngularDamping: 2.0, mMassPropertiesOverride: 100.0, mAllowedDOFs: 23 }
+      settings: { mAngularDamping: 10.0, mMassPropertiesOverride: 100.0 }
     });
   }
 
@@ -100,14 +100,11 @@ export class Enemy {
     // Jolt Logic
     const pos = this.physicsBody.body.GetPosition();
     const myPos = JOLT_RVEC3_TO_VEC3(pos);
-    
     const dx = targetPos[0] - myPos[0];
     const dz = targetPos[2] - myPos[2];
     const dist = Math.sqrt(dx*dx + dz*dz);
-    
     const targetAngle = Math.atan2(-dx, -dz);
     
-    // Smooth rotation towards target
     const PI2 = Math.PI * 2;
     let angleDiff = (targetAngle - this.rotation) % PI2;
     if (angleDiff > Math.PI) angleDiff -= PI2;
@@ -115,37 +112,12 @@ export class Enemy {
     
     const rotSpeed = 2.0;    
     this.rotation += Math.sign(angleDiff) * Math.min(Math.abs(angleDiff), rotSpeed * (ts / 1000));
-    
-    // Simple Chase - Stop when close
-    const speed = 6;
-    let throttle = 0;
-    if (dist > 15) {
-        throttle = 1; // Move forward
-    } else if (dist < 10) {
-        throttle = -0.5; // Back up a bit
-    }
 
-    const forward = [-Math.sin(this.rotation), 0, -Math.cos(this.rotation)] as vec3;
-    const linVel = UT.VEC3_SCALE(forward, throttle * speed);
-    
-    const curVel = this.physicsBody.body.GetLinearVelocity();
-    
-    const mass = 100.0;
-    const velDiffX = linVel[0] - curVel.GetX();
-    const velDiffZ = linVel[2] - curVel.GetZ();
-    const kp = 8.0;
-    const maxForce = 2500.0;
-    const forceX = Math.max(-maxForce, Math.min(maxForce, velDiffX * mass * kp));
-    const forceZ = Math.max(-maxForce, Math.min(maxForce, velDiffZ * mass * kp));
-    const joltForce = new Gfx3Jolt.Vec3(forceX, 0, forceZ);
-    gfx3JoltManager.bodyInterface.AddForce(this.physicsBody.body.GetID(), joltForce, Gfx3Jolt.EActivation_Activate);
-    
-    const curPos = this.physicsBody.body.GetPosition();
     let quat = Quaternion.createFromEuler(this.rotation, 0, 0, 'YXZ');
     
     // Smooth banking
     let targetUp: vec3 = [0, 1, 0];
-    const ray = gfx3JoltManager.createRay(curPos.GetX(), curPos.GetY() + 0.5, curPos.GetZ(), curPos.GetX(), curPos.GetY() - 2.0, curPos.GetZ());
+    const ray = gfx3JoltManager.createRay(pos.GetX(), pos.GetY() + 0.5, pos.GetZ(), pos.GetX(), pos.GetY() - 2.0, pos.GetZ());
     if (ray.normal && ray.normal.GetY() > 0.5) {
         targetUp = [ray.normal.GetX(), ray.normal.GetY(), ray.normal.GetZ()];
     }
@@ -166,6 +138,32 @@ export class Enemy {
 
     const joltQuat = new Gfx3Jolt.Quat(quat.x, quat.y, quat.z, quat.w);
     gfx3JoltManager.bodyInterface.SetRotation(this.physicsBody.body.GetID(), joltQuat, Gfx3Jolt.EActivation_Activate);
+    gfx3JoltManager.bodyInterface.SetAngularVelocity(this.physicsBody.body.GetID(), new Gfx3Jolt.Vec3(0, 0, 0));
+
+    // Physics Movement Update
+    const speed = 6;
+    let throttle = 0;
+    if (dist > 15) {
+        throttle = 1; 
+    } else if (dist < 10) {
+        throttle = -0.5; 
+    }
+
+    const forward = quat.rotateVector([0, 0, -1]);
+    const linVel = UT.VEC3_SCALE(forward, throttle * speed);
+    const curVel = this.physicsBody.body.GetLinearVelocity();
+    
+    const mass = 100.0;
+    const velDiffX = linVel[0] - curVel.GetX();
+    const velDiffY = linVel[1] - curVel.GetY();
+    const velDiffZ = linVel[2] - curVel.GetZ();
+    const kp = 10.0;
+    const maxForce = 2500.0;
+    const forceX = Math.max(-maxForce, Math.min(maxForce, velDiffX * mass * kp));
+    const forceY = Math.max(-maxForce, Math.min(maxForce, velDiffY * mass * kp));
+    const forceZ = Math.max(-maxForce, Math.min(maxForce, velDiffZ * mass * kp));
+    const joltForce = new Gfx3Jolt.Vec3(forceX, forceY, forceZ);
+    gfx3JoltManager.bodyInterface.AddForce(this.physicsBody.body.GetID(), joltForce, Gfx3Jolt.EActivation_Activate);
     
     let didShoot = false;
     let muzzlePos: vec3 | undefined = undefined;
