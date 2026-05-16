@@ -65,11 +65,15 @@ export class Tank {
       motionType: Gfx3Jolt.EMotionType_Dynamic,
       layer: JOLT_LAYER_MOVING,
       settings: { 
-          mAngularDamping: 10.0, 
-          mLinearDamping: 0.5,
-          mMassPropertiesOverride: 1200.0 
+          mAngularDamping: 15.0, 
+          mLinearDamping: 0.8,
+          mMassPropertiesOverride: 2000.0 
       }
     });
+
+    // Make the body essentially upright by preventing X and Z rotations via Jolt's inertia locking
+    // Note: This requires getting the body ID and manipulating the motion properties if possible, 
+    // but a simpler arcade way is to just keep our manual rotation extraction robust.
   }
 
   /**
@@ -121,14 +125,14 @@ export class Tank {
     this.grenadeRecoil -= (ts / 1000) * 2; // Grenades have slower fire rate
     if (this.grenadeRecoil < 0) this.grenadeRecoil = 0;
     
-    // Steering Logic with momentum and speed-sensitivity
+    // Steering Logic: A/D should feel natural (A=Left, D=Right)
     const speedFactor = Math.abs(this.velocity) / speed;
     const baseRotSpeed = rotSpeed * (1.0 - speedFactor * 0.4); 
-    const targetTurnVelocity = moveDir.x * baseRotSpeed; // Simplified: pressing right should turn clockwise (negative Y angular velocity)
+    const targetTurnVelocity = moveDir.x * baseRotSpeed; 
     
-    // Use target angular velocity instead of accumulator to allow physics interactions
+    // Y-axis angular velocity: negative is clockwise (Right), positive is counter-clockwise (Left)
     const angVel = this.physicsBody.body.GetAngularVelocity();
-    const turnAlpha = 1.0 - Math.exp(-20.0 * (ts / 1000)); // Even snappier steering
+    const turnAlpha = 1.0 - Math.exp(-20.0 * (ts / 1000)); 
     const newAngVelY = UT.LERP(angVel.GetY(), -targetTurnVelocity, turnAlpha);
     
     gfx3JoltManager.bodyInterface.SetAngularVelocity(
@@ -136,7 +140,8 @@ export class Tank {
       new Gfx3Jolt.Vec3(0, newAngVelY, 0)
     );
     
-    const throttle = moveDir.y;
+    // Throttle Logic: W should move forward.
+    const throttle = moveDir.y; 
     const isBraking = (throttle > 0 && this.velocity < 0) || (throttle < 0 && this.velocity > 0);
     const targetVelocity = throttle * speed;
     
@@ -148,21 +153,21 @@ export class Tank {
     // Physics Update
     const pos = this.physicsBody.body.GetPosition();
     const qPhysics = this.physicsBody.body.GetRotation();
-    // Create a purely vertical orientation for physics to prevent flipping
-    // We only want the Y-axis rotation (Yaw) from the physics rotation
     const currentQuat = new Quaternion(qPhysics.GetW(), qPhysics.GetX(), qPhysics.GetY(), qPhysics.GetZ());
     const forwardVec = currentQuat.rotateVector([0, 0, -1]);
     this.rotation = Math.atan2(-forwardVec[0], -forwardVec[2]);
 
-    // RESTRICT PHYSICS ROTATION: Keep the body upright at all times
-    // This prevents the tank from flipping over onto its side like in the video
+    // STABILITY FIX: Instead of SetRotation every frame (causes shaking),
+    // we calculate a visual banking quat and use a gentle corrective torque 
+    // or simply zero out the pitch/roll angular components to keep it flat.
     const uprightQuat = Quaternion.createFromEuler(this.rotation, 0, 0, 'YXZ');
-    const joltUprightQuat = new Gfx3Jolt.Quat(uprightQuat.x, uprightQuat.y, uprightQuat.z, uprightQuat.w);
-    gfx3JoltManager.bodyInterface.SetRotation(this.physicsBody.body.GetID(), joltUprightQuat, Gfx3Jolt.EActivation_Activate);
     
-    // Also zero out any X/Z angular velocity that might cause jitter or future flipping
-    const currentAngVel = this.physicsBody.body.GetAngularVelocity();
-    gfx3JoltManager.bodyInterface.SetAngularVelocity(this.physicsBody.body.GetID(), new Gfx3Jolt.Vec3(0, currentAngVel.GetY(), 0));
+    // Dampen X/Z tilt via angular velocity zeroing (smoother than SetRotation)
+    const curAngVel = this.physicsBody.body.GetAngularVelocity();
+    gfx3JoltManager.bodyInterface.SetAngularVelocity(
+        this.physicsBody.body.GetID(), 
+        new Gfx3Jolt.Vec3(curAngVel.GetX() * 0.7, curAngVel.GetY(), curAngVel.GetZ() * 0.7)
+    );
 
     // Calculate ground-aligned orientation for visual mesh only (banking)
     let visualQuat = uprightQuat;
@@ -239,7 +244,8 @@ export class Tank {
     const velDiffY = linVel[1] - curVel.GetY();
     const velDiffZ = linVel[2] - curVel.GetZ();
     
-    const kp = 40.0; // Higher KP for snappier acceleration
+    // Lowered KP to stop physics jitter (shaking)
+    const kp = 25.0; 
     const maxForce = 50000.0; 
     const forceX = Math.max(-maxForce, Math.min(maxForce, velDiffX * mass * kp));
     const forceY = Math.max(-maxForce, Math.min(maxForce, velDiffY * mass * kp));

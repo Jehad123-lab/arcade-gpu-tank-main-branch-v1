@@ -291,7 +291,7 @@ export class GameScreen extends Screen {
         let shakeX = 0, shakeY = 0, shakeZ = 0;
         const totalRecoil = this.tank.shellRecoil + this.tank.grenadeRecoil * 0.5 + this.tank.recoil * 0.5;
         if (totalRecoil > 0) {
-            const mag = totalRecoil * 0.1; // Reduced shake
+            const mag = totalRecoil * 0.05; // Toned down shake even more
             shakeX = (Math.random() - 0.5) * mag;
             shakeY = (Math.random() - 0.5) * mag;
             shakeZ = (Math.random() - 0.5) * mag;
@@ -299,9 +299,9 @@ export class GameScreen extends Screen {
 
         this.camera.setPosition(finalCamPos[0] + shakeX, finalCamPos[1] + shakeY, finalCamPos[2] + shakeZ);
         this.camera.lookAt(
-            this.cameraLookTarget[0] + shakeX * 0.3, 
-            this.cameraLookTarget[1] + shakeY * 0.3, 
-            this.cameraLookTarget[2] + shakeZ * 0.3
+            this.cameraLookTarget[0], 
+            this.cameraLookTarget[1] + targetHeightOffset, 
+            this.cameraLookTarget[2]
         );
     }
   }
