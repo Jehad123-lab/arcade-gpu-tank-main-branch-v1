@@ -166,10 +166,10 @@ export class GameScreen extends Screen {
     inputManager.update(ts);
     gfx3JoltManager.update(ts);
 
-    if (inputManager.isActiveAction('CAM_L')) this.cameraYaw -= 0.05;
-    if (inputManager.isActiveAction('CAM_R')) this.cameraYaw += 0.05;
-    if (inputManager.isActiveAction('CAM_Z_IN')) this.cameraDistance = Math.max(5, this.cameraDistance - 0.5);
-    if (inputManager.isActiveAction('CAM_Z_OUT')) this.cameraDistance = Math.min(40, this.cameraDistance + 0.5);
+    if (inputManager.isActiveAction('CAM_L')) this.cameraYaw -= 2.5 * (ts / 1000);
+    if (inputManager.isActiveAction('CAM_R')) this.cameraYaw += 2.5 * (ts / 1000);
+    if (inputManager.isActiveAction('CAM_Z_IN')) this.cameraDistance = Math.max(5, this.cameraDistance - 10 * (ts / 1000));
+    if (inputManager.isActiveAction('CAM_Z_OUT')) this.cameraDistance = Math.min(40, this.cameraDistance + 10 * (ts / 1000));
 
     let kbX = 0;
     let kbY = 0;
@@ -235,54 +235,52 @@ export class GameScreen extends Screen {
     }
     
     // Convert spherical to cartesian coords for the camera offset
-    // Camera is pos relative to target
     const cy = this.cameraYaw;
     const cp = this.cameraPitch;
     
-    // We add math to find offset pos based on orbit
     const camOffset = [
         Math.sin(cy) * Math.cos(cp) * this.cameraDistance,
-        Math.sin(cp) * this.cameraDistance,
+        Math.max(0.5, Math.sin(cp) * this.cameraDistance),
         Math.cos(cy) * Math.cos(cp) * this.cameraDistance
     ];
     
-    const targetHeightOffset = 1.5;
+    const targetHeightOffset = 1.8;
     const followPos = playerPos;
     
-    // Safety check for followPos to prevent NaN camera
     if (!followPos || isNaN(followPos[0]) || isNaN(followPos[1]) || isNaN(followPos[2])) {
         return;
     }
 
-    const camTarget = [
+    const camTargetPos = [
         followPos[0] + camOffset[0],
         followPos[1] + camOffset[1] + targetHeightOffset,
         followPos[2] + camOffset[2]
     ] as vec3;
     
     const camPos = this.camera.getPosition();
-    // Smooth frame-rate independent lerp
-    const posLerpRate = 1.0 - Math.exp(-10.0 * (ts / 1000));
-    const targetLerpRate = 1.0 - Math.exp(-15.0 * (ts / 1000));
-
-    const lerpedPos = UT.VEC3_LERP(camPos, camTarget, posLerpRate);
+    const posAlpha = 1.0 - Math.exp(-8.0 * (ts / 1000));
+    const finalCamPos = UT.VEC3_LERP(camPos, camTargetPos, posAlpha);
     
-    const desiredLookTarget = [followPos[0], followPos[1] + targetHeightOffset, followPos[2]] as vec3;
-    this.cameraLookTarget = UT.VEC3_LERP(this.cameraLookTarget, desiredLookTarget, targetLerpRate);
+    const lookTargetGoal = [followPos[0], followPos[1] + targetHeightOffset, followPos[2]] as vec3;
+    const lookAlpha = 1.0 - Math.exp(-12.0 * (ts / 1000));
+    this.cameraLookTarget = UT.VEC3_LERP(this.cameraLookTarget, lookTargetGoal, lookAlpha);
     
-    // Final NaN check before setting
-    if (!isNaN(lerpedPos[0]) && !isNaN(lerpedPos[1]) && !isNaN(lerpedPos[2])) {
+    if (!isNaN(finalCamPos[0])) {
         let shakeX = 0, shakeY = 0, shakeZ = 0;
-        const totalRecoil = this.tank.shellRecoil + this.tank.grenadeRecoil * 0.5;
+        const totalRecoil = this.tank.shellRecoil + this.tank.grenadeRecoil * 0.5 + this.tank.recoil * 0.5;
         if (totalRecoil > 0) {
-            const mag = totalRecoil * 0.1;
+            const mag = totalRecoil * 0.15;
             shakeX = (Math.random() - 0.5) * mag;
             shakeY = (Math.random() - 0.5) * mag;
             shakeZ = (Math.random() - 0.5) * mag;
         }
 
-        this.camera.setPosition(lerpedPos[0] + shakeX, lerpedPos[1] + shakeY, lerpedPos[2] + shakeZ);
-        this.camera.lookAt(this.cameraLookTarget[0] + shakeX * 0.5, this.cameraLookTarget[1] + shakeY * 0.5, this.cameraLookTarget[2] + shakeZ * 0.5);
+        this.camera.setPosition(finalCamPos[0] + shakeX, finalCamPos[1] + shakeY, finalCamPos[2] + shakeZ);
+        this.camera.lookAt(
+            this.cameraLookTarget[0] + shakeX * 0.3, 
+            this.cameraLookTarget[1] + shakeY * 0.3, 
+            this.cameraLookTarget[2] + shakeZ * 0.3
+        );
     }
   }
 

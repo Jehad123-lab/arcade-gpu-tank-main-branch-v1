@@ -117,12 +117,14 @@ export class Tank {
     this.grenadeRecoil -= (ts / 1000) * 2; // Grenades have slower fire rate
     if (this.grenadeRecoil < 0) this.grenadeRecoil = 0;
     
-    // Steering Logic
-    this.rotation -= moveDir.x * rotSpeed * (ts / 1000); 
+    // Steering Logic with momentum
+    const targetRotSpeed = -moveDir.x * rotSpeed;
+    const rotAlpha = 1.0 - Math.exp(-5.0 * (ts / 1000));
+    this.rotation += targetRotSpeed * rotAlpha * (ts / 1000) * 10; 
     
     const throttle = moveDir.y;
     const targetVelocity = throttle * speed;
-    const accelRate = throttle !== 0 ? 0.05 : 0.1;
+    const accelRate = 1.0 - Math.exp((throttle !== 0 ? -3.0 : -6.0) * (ts / 1000));
     this.velocity = UT.LERP(this.velocity, targetVelocity, accelRate);
 
     // Physics Update
@@ -206,8 +208,8 @@ export class Tank {
     const velDiffY = linVel[1] - curVel.GetY();
     const velDiffZ = linVel[2] - curVel.GetZ();
     
-    const kp = 20.0; 
-    const maxForce = 25000.0;
+    const kp = 25.0; 
+    const maxForce = 45000.0;
     const forceX = Math.max(-maxForce, Math.min(maxForce, velDiffX * mass * kp));
     const forceY = Math.max(-maxForce, Math.min(maxForce, velDiffY * mass * kp));
     const forceZ = Math.max(-maxForce, Math.min(maxForce, velDiffZ * mass * kp));
@@ -220,7 +222,12 @@ export class Tank {
     const origin: vec3 = [pos.GetX(), pos.GetY(), pos.GetZ()];
 
     // Root Body Matrix
-    const bodyMatrix = UT.MAT4_TRANSFORM(origin, [0, 0, 0], [1, 1, 1], q);
+    const bodyRecoil = this.recoil > 0 ? this.recoil * 0.05 : 0;
+    const recoilQ = Quaternion.createFromEuler(0, bodyRecoil, 0, 'YXZ');
+    const finalVisualQ = q.mul(recoilQ.w, recoilQ.x, recoilQ.y, recoilQ.z);
+
+    const bodyMatrix = UT.MAT4_TRANSFORM(origin, [0, 0, 0], [1, 1, 1], finalVisualQ);
+    this.recoil = UT.LERP(this.recoil, 0, 5.0 * (ts / 1000));
     
     // Body Mesh
     this.body.enableManualTransform(bodyMatrix);

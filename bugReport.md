@@ -15,6 +15,8 @@ Tracking all issues, from critical bugs to minor suggestions.
 -   **[RESOLVED] TANK DEFORMATION**: Sub-meshes drifted during rotation. Fixed with rigid matrix hierarchy sync.
 -   **[RESOLVED] GROUND SINKING**: Visual meshes were offset downwards. Fixed by center-aligning meshes with physics bodies.
 -   **[RESOLVED] CAMERA TRACKING**: Camera tracked stale mesh positions. Fixed by tracking physics bodies directly.
+-   **[RESOLVED] CAMERA JITTER**: Refactored camera orbit interpolation to eliminate micro-shaking.
+-   **[RESOLVED] TANK HANDLING**: Added momentum and improved steering responsiveness.
 
 ## Warning (Unexpected Behavior)
 
