@@ -141,11 +141,11 @@ export class GameScreen extends Screen {
     inputManager.setPointerLockEnabled(true);
     eventManager.subscribe(inputManager, 'E_MOUSE_MOVE', this, this.handleMouseMove);
 
-    this.camera.setPosition(0, 10, 18); // Start at cy=0 position offset (0, 10, distance)
+    this.camera.setPosition(0, 12, 20); // Start at cy=0 position offset (0, 12, distance)
     this.camera.lookAt(0, 0, 0);
     this.cameraYaw = 0;
-    this.cameraPitch = 0.45;
-    this.cameraDistance = 18;
+    this.cameraPitch = 0.55;
+    this.cameraDistance = 20;
     this.camera.getView().setBgColor(0.53, 0.81, 0.92, 1.0); // Sky blue
     
     const tankP = this.tank.physicsBody.body.GetPosition();
@@ -178,15 +178,15 @@ export class GameScreen extends Screen {
     }
     
     // Flexible Auto-Align Camera behind tank when moving
-    // Only kick in if user hasn't moved mouse for 1.5 seconds
+    // Only kick in if user hasn't moved mouse for 1.2 seconds
     const now = Date.now();
-    if (now - this.lastMouseManualTS > 1500 && Math.abs(this.tank.velocity) > 2.0) {
+    if (now - this.lastMouseManualTS > 1200 && Math.abs(this.tank.velocity) > 1.5) {
         const targetYaw = this.tank.rotation;
         let diff = ((targetYaw - this.cameraYaw) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
         if (diff > Math.PI) diff -= Math.PI * 2;
         
-        const alignmentIntensity = UT.LERP(0.4, 2.0, Math.min(1.0, Math.abs(diff) / (Math.PI / 2)));
-        const autoAlignSpeed = alignmentIntensity * (ts / 1000);
+        // Even smoother alignment speed
+        const autoAlignSpeed = 1.2 * (ts / 1000); 
         this.cameraYaw += Math.sign(diff) * Math.min(Math.abs(diff), autoAlignSpeed);
     }
 
@@ -266,7 +266,7 @@ export class GameScreen extends Screen {
         Math.cos(cy) * Math.cos(cp) * this.cameraDistance
     ];
     
-    const targetHeightOffset = 2.2;
+    const targetHeightOffset = 3.0; // Higher offset to keep tank lower in frame
     const followPos = playerPos;
     
     if (!followPos || isNaN(followPos[0]) || isNaN(followPos[1]) || isNaN(followPos[2])) {
@@ -275,16 +275,16 @@ export class GameScreen extends Screen {
 
     const camTargetPos = [
         followPos[0] + camOffset[0],
-        followPos[1] + camOffset[1] + targetHeightOffset,
+        followPos[1] + camOffset[1], // Offset is now part of camOffset height calculation
         followPos[2] + camOffset[2]
     ] as vec3;
     
     const camPos = this.camera.getPosition();
-    const posAlpha = 1.0 - Math.exp(-6.0 * (ts / 1000));
+    const posAlpha = 1.0 - Math.exp(-8.0 * (ts / 1000)); // Faster follow
     const finalCamPos = UT.VEC3_LERP(camPos, camTargetPos, posAlpha);
     
     const lookTargetGoal = [followPos[0], followPos[1] + targetHeightOffset, followPos[2]] as vec3;
-    const lookAlpha = 1.0 - Math.exp(-10.0 * (ts / 1000));
+    const lookAlpha = 1.0 - Math.exp(-15.0 * (ts / 1000)); // Faster look-at follow
     this.cameraLookTarget = UT.VEC3_LERP(this.cameraLookTarget, lookTargetGoal, lookAlpha);
     
     if (!isNaN(finalCamPos[0])) {

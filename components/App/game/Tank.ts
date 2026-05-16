@@ -64,7 +64,11 @@ export class Tank {
       x: 0, y: 0.8, z: 0,
       motionType: Gfx3Jolt.EMotionType_Dynamic,
       layer: JOLT_LAYER_MOVING,
-      settings: { mAngularDamping: 5.0, mMassPropertiesOverride: 800.0 }
+      settings: { 
+          mAngularDamping: 10.0, 
+          mLinearDamping: 0.5,
+          mMassPropertiesOverride: 1200.0 
+      }
     });
   }
 
@@ -144,15 +148,24 @@ export class Tank {
     // Physics Update
     const pos = this.physicsBody.body.GetPosition();
     const qPhysics = this.physicsBody.body.GetRotation();
+    // Create a purely vertical orientation for physics to prevent flipping
+    // We only want the Y-axis rotation (Yaw) from the physics rotation
     const currentQuat = new Quaternion(qPhysics.GetW(), qPhysics.GetX(), qPhysics.GetY(), qPhysics.GetZ());
-    
-    // Update our internal rotation from physics to stay in sync with collisions
-    // Extract yaw from forward vector: Yaw is angle around Y
     const forwardVec = currentQuat.rotateVector([0, 0, -1]);
-    this.rotation = Math.atan2(-forwardVec[0], -forwardVec[2]); // Standard: atan2(-x, -z) for rotation where North is [0, 0, -1]
+    this.rotation = Math.atan2(-forwardVec[0], -forwardVec[2]);
 
-    // Calculate ground-aligned orientation for movement (visual only banking)
-    let quat = currentQuat;
+    // RESTRICT PHYSICS ROTATION: Keep the body upright at all times
+    // This prevents the tank from flipping over onto its side like in the video
+    const uprightQuat = Quaternion.createFromEuler(this.rotation, 0, 0, 'YXZ');
+    const joltUprightQuat = new Gfx3Jolt.Quat(uprightQuat.x, uprightQuat.y, uprightQuat.z, uprightQuat.w);
+    gfx3JoltManager.bodyInterface.SetRotation(this.physicsBody.body.GetID(), joltUprightQuat, Gfx3Jolt.EActivation_Activate);
+    
+    // Also zero out any X/Z angular velocity that might cause jitter or future flipping
+    const currentAngVel = this.physicsBody.body.GetAngularVelocity();
+    gfx3JoltManager.bodyInterface.SetAngularVelocity(this.physicsBody.body.GetID(), new Gfx3Jolt.Vec3(0, currentAngVel.GetY(), 0));
+
+    // Calculate ground-aligned orientation for visual mesh only (banking)
+    let visualQuat = uprightQuat;
     
     // Cast rays from 4 corners down to find the ground normal for smooth banking
     const hw = 1.5; // Half-width
@@ -212,11 +225,11 @@ export class Tank {
         const clampedDot = Math.max(-1, Math.min(1, dot));
         const angle = Math.acos(clampedDot);
         const alignQ = Quaternion.createFromAxisAngle(axis, angle);
-        quat = alignQ.mul(quat.w, quat.x, quat.y, quat.z);
+        visualQuat = alignQ.mul(visualQuat.w, visualQuat.x, visualQuat.y, visualQuat.z);
     }
 
     // Physics Movement Update
-    const forwardVecActual = currentQuat.rotateVector([0, 0, -1]);
+    const forwardVecActual = uprightQuat.rotateVector([0, 0, -1]);
     const linVel = UT.VEC3_SCALE(forwardVecActual, this.velocity);
     const curVel = this.physicsBody.body.GetLinearVelocity();
     
@@ -236,7 +249,7 @@ export class Tank {
     gfx3JoltManager.bodyInterface.AddForce(this.physicsBody.body.GetID(), joltForce, Gfx3Jolt.EActivation_Activate);
 
     // Sync Visuals
-    const q = quat;
+    const q = visualQuat;
     const origin: vec3 = [pos.GetX(), pos.GetY(), pos.GetZ()];
 
     // Root Body Matrix

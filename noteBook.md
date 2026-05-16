@@ -14,6 +14,7 @@ A log of all tasks, ideas, and progress for this project.
 
 ## Done
 
+-   **[2026-05-16 09:52]**: Fixed "Flipping Tank" syndrome by enforcing upright physics orientation every frame (locking X/Z rotation). Retuned camera for a "Tactical Arcade" view: increased height, distance, and pitch for better battlefield situational awareness. Smoothed out camera tracking and look-target interpolation to reduce jitter.
 -   **[2026-05-16 09:44]**: Fixed fundamental control inversion and "W-goes-right" behavior. Standardized yaw extraction using `atan2(-x, -z)`. Synchronized initial camera state to prevent orientation jumps. Overhauled physics parameters (Mass 1000, KP 40) for a "Modern Arcade" responsive feel with tight drifting and high-precision steering.
 -   **[2026-05-16 09:35]**: Fixed critical crash `TypeError: currentQuat.toEuler is not a function` by implementing manual yaw extraction from the forward vector.
 -   **[2026-05-16 09:31]**: Major steering overhaul: Switched from "Warp-based" rotation to physics-based `SetAngularVelocity` for realistic hull collisions and momentum. Implemented "Manual Override" for the auto-follow camera, which pauses alignment during active aiming to prevent camera fighting. Increased tank mass and refined forces for a "Heavy Arcade" feel inspired by modern tank sims.
