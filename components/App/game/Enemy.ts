@@ -82,7 +82,7 @@ export class Enemy {
 
     this.physicsBody = gfx3JoltManager.addBox({
       width: 1.5, height: 0.8, depth: 2.2, // Increased height for stability
-      x, y: y + 0.5, z,
+      x, y: 0.4, z, // Lowered start Y to touch ground (0.8 / 2 = 0.4)
       motionType: Gfx3Jolt.EMotionType_Dynamic,
       layer: JOLT_LAYER_MOVING,
       settings: { 
@@ -111,8 +111,8 @@ export class Enemy {
     const qPhysics = this.physicsBody.body.GetRotation();
     const currentQuat = new Quaternion(qPhysics.GetW(), qPhysics.GetX(), qPhysics.GetY(), qPhysics.GetZ());
     
-    // Use [0, 0, 1] as Forward if [0, 0, -1] was inverted
-    const forwardVec = currentQuat.rotateVector([0, 0, 1]);
+    // Extract Yaw from current physics orientation
+    const forwardVec = currentQuat.rotateVector([0, 0, -1]); // Standardize to -Z as Forward
     this.rotation = Math.atan2(-forwardVec[0], -forwardVec[2]);
 
     const myPos = JOLT_RVEC3_TO_VEC3(pos);
@@ -138,7 +138,7 @@ export class Enemy {
 
     // STABILIZATION TORQUE: Neutralize Pitch and Roll
     const currentUpVec = currentQuat.rotateVector([0, 1, 0]);
-    const stabilityAlpha = 500000.0; // Proportional to enemy mass
+    const stabilityAlpha = 1200000.0; // Proportional to enemy mass 1500
     gfx3JoltManager.bodyInterface.AddTorque(
         this.physicsBody.body.GetID(), 
         new Gfx3Jolt.Vec3(-currentUpVec[2] * stabilityAlpha, 0, currentUpVec[0] * stabilityAlpha)
@@ -177,8 +177,8 @@ export class Enemy {
         throttle = -0.5; 
     }
 
-    // MOVEMENT STABILITY: Smoothed velocity matching using [0, 0, 1] as forward
-    const forwardVecActual = currentQuat.rotateVector([0, 0, 1]);
+    // MOVEMENT STABILITY: Smoothed velocity matching using [0, 0, -1] as forward
+    const forwardVecActual = currentQuat.rotateVector([0, 0, -1]);
     const currentJoltVel = this.physicsBody.body.GetLinearVelocity();
     const targetLinearVel = UT.VEC3_SCALE(forwardVecActual, throttle * speed);
     
@@ -241,7 +241,11 @@ export class Enemy {
 
     const pos = this.physicsBody.body.GetPosition();
     const q = this.visualQuat;
-    const origin: vec3 = [pos.GetX(), pos.GetY(), pos.GetZ()];
+    
+    // Mesh alignment: Physics box is 0.8 high, Body mesh is 0.6.
+    // Center of physics is at 0.4 (local). To align mesh floor to physics floor:
+    // MeshCenterY = PhysicsCenterY - (0.8/2 - 0.6/2) = PhysicsCenterY - 0.1.
+    const origin: vec3 = [pos.GetX(), pos.GetY() - 0.1, pos.GetZ()];
 
     const matBody = UT.MAT4_TRANSFORM(origin, ZERO, scale, q);
     gfx3MeshRenderer.drawMesh(Enemy.bodyMesh, matBody);

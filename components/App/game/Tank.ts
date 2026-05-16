@@ -61,11 +61,11 @@ export class Tank {
 
     this.physicsBody = gfx3JoltManager.addBox({
       width: 3.45, height: 1.2, depth: 3.6, // Increased height for better collision volume
-      x: 0, y: 1.0, z: 0,
+      x: 0, y: 0.6, z: 0, // Lowered Y to touch the ground (height 1.2 / 2 = 0.6)
       motionType: Gfx3Jolt.EMotionType_Dynamic,
       layer: JOLT_LAYER_MOVING,
       settings: { 
-          mAngularDamping: 10.0, 
+          mAngularDamping: 15.0, 
           mLinearDamping: 1.5,
           mMassPropertiesOverride: 10000.0, // Even heavier for grounded feel
           mCenterOfMassOffset: new Gfx3Jolt.Vec3(0, -0.4, 0) // Lower center of mass for stability
@@ -157,7 +157,7 @@ export class Tank {
     const currentQuat = new Quaternion(qPhysics.GetW(), qPhysics.GetX(), qPhysics.GetY(), qPhysics.GetZ());
     
     // Extract Yaw from current physics orientation
-    const forwardVec = currentQuat.rotateVector([0, 0, 1]);
+    const forwardVec = currentQuat.rotateVector([0, 0, -1]); // Back to -Z as Forward
     this.rotation = Math.atan2(-forwardVec[0], -forwardVec[2]);
 
     const uprightQuat = Quaternion.createFromEuler(this.rotation, 0, 0, 'YXZ');
@@ -165,9 +165,9 @@ export class Tank {
     // STABILIZATION TORQUE: Neutralize Pitch and Roll (X, Z) to keep the tank upright.
     // We calculate the current local "up" in world space and apply torque towards world "up".
     const currentUpVec = currentQuat.rotateVector([0, 1, 0]);
-    const tiltErrorX = -currentUpVec[2]; // Simplified roll/pitch error
+    const tiltErrorX = -currentUpVec[2]; 
     const tiltErrorZ = currentUpVec[0];  
-    const stabilityAlpha = 5000000.0; // Strong corrective torque
+    const stabilityAlpha = 8000000.0; // Slightly stronger for mass 10k
     
     gfx3JoltManager.bodyInterface.AddTorque(
         this.physicsBody.body.GetID(), 
@@ -175,7 +175,7 @@ export class Tank {
     );
 
     // MOVEMENT STABILITY: Proportional Velocity matching
-    const forwardVecActual = uprightQuat.rotateVector([0, 0, 1]);
+    const forwardVecActual = uprightQuat.rotateVector([0, 0, -1]); // Use -Z for forward
     const currentJoltVel = this.physicsBody.body.GetLinearVelocity();
     const targetLinearVel = UT.VEC3_SCALE(forwardVecActual, this.velocity);
     
@@ -256,7 +256,11 @@ export class Tank {
 
     // Sync Visuals
     const q = visualQuat;
-    const origin: vec3 = [pos.GetX(), pos.GetY(), pos.GetZ()];
+    
+    // Mesh alignment: Physics box is 1.2 high, Body mesh is 0.9.
+    // Center of physics is at 0.6 (local). To align mesh floor to physics floor:
+    // MeshCenterY = PhysicsCenterY - (1.2/2 - 0.9/2) = PhysicsCenterY - 0.15.
+    const origin: vec3 = [pos.GetX(), pos.GetY() - 0.15, pos.GetZ()];
 
     // Root Body Matrix
     const bodyRecoil = this.recoil > 0 ? this.recoil * 0.05 : 0;
